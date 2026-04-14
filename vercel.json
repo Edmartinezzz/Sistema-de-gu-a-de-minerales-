@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "name": "sistema-minerales-laguaira",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/verificar/(.*)", "destination": "/api" }
