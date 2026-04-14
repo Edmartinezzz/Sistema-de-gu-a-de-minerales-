@@ -37,7 +37,7 @@ router.get('/todos', authenticateToken, requireRole(['master']), async (req, res
         });
     } catch (error) {
         console.error('Error al obtener todos los minerales:', error);
-        res.status(500).json({ error: 'Error al obtener minerales' });
+        res.status(500).json({ error: 'Error al obtener minerales: ' + error.message });
     }
 });
 
