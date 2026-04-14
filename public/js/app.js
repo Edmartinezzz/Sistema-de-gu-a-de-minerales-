@@ -1,72 +1,75 @@
-// Variablse globales heredadas para compatibilidad
+// Configuraci├â┬│n de API Din├â┬ímica para Previews y Producci├â┬│n
+let API_BASE = '';
+if (window.location.protocol === 'file:' || (window.location.hostname === 'localhost' && window.location.port !== '3000' && window.location.port !== '8080')) {
+    // Si corre desde Android APK (file://) usamos la URL de producci├â┬│n
+    API_BASE = 'https://sistema-de-gu-a-de-minerales.vercel.app/api';
+} else {
+    // Si corre en la web (Vercel Prod, Vercel Previews, Localhost), usamos el origen relativo
+    API_BASE = window.location.origin + '/api';
+}
 let currentUser = null;
 let authToken = null;
-let tasaBCV = window.CONFIG.TASA_BCV_DEFAULT;
-let systemConfig = { modulo_pagos_habilitado: 'false' };
+let tasaBCV = 36.50; // Tasa por defecto
+let systemConfig = {
+    modulo_pagos_habilitado: 'false'
+};
 
-// ===== INICIALIZACIÓN =====
+// Variable global para el esc├â┬íner
+let html5QrCode = null;
+
+// ===== INICIALIZACI├âÔÇ£N =====
 document.addEventListener('DOMContentLoaded', async () => {
-    // Sincronizar variables globales legacy con AuthService
-    const session = await window.AuthService.verifySession();
-    
-    if (session) {
-        currentUser = window.currentUser;
-        authToken = window.authToken;
-        // Cargar configuración inicial
+    // Verificar si hay token guardado
+    authToken = localStorage.getItem('authToken');
+
+    if (authToken) {
+        // Cargar configuraci├â┬│n solo si hay token
         await Promise.all([
-            window.refreshTasaBCV ? window.refreshTasaBCV() : Promise.resolve(),
-            window.refreshSystemConfig ? window.refreshSystemConfig() : Promise.resolve()
+            refreshTasaBCV(),
+            refreshSystemConfig()
         ]);
-        window.showPage('dashboard-page');
-        window.loadDashboard();
+        verifyToken();
     } else {
-        window.showPage('login-page');
+        showPage('login-page');
     }
 
     // Event Listeners
-    const loginForm = document.getElementById('login-form');
-    if (loginForm) loginForm.addEventListener('submit', handleLoginRefactored);
-    
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) logoutBtn.addEventListener('click', () => window.AuthService.logout());
+    document.getElementById('login-form').addEventListener('submit', handleLogin);
+    document.getElementById('logout-btn').addEventListener('click', handleLogout);
 
-    // Navigation and other listeners...
-    setupNavigation();
+    // QR Scanner Listeners
+    const btnScan = document.getElementById('btn-scan-qr');
+    if (btnScan) btnScan.addEventListener('click', startScanner);
     
+    const btnStopScan = document.getElementById('btn-stop-scan');
+    if (btnStopScan) btnStopScan.addEventListener('click', stopScanner);
+
+    // Notification Toggle
+    const notifBtn = document.getElementById('notification-btn');
+    if (notifBtn) {
+        notifBtn.addEventListener('click', toggleNotifications);
+    }
+
+    // Close notifications on click outside
+    document.addEventListener('click', (e) => {
+        const popover = document.getElementById('notification-popover');
+        const btn = document.getElementById('notification-btn');
+        if (popover && popover.classList.contains('active') && btn && !popover.contains(e.target) && !btn.contains(e.target)) {
+            popover.classList.remove('active');
+        }
+    });
+
+    // Navigation handlers
+    setupNavigation();
+
+    // Mobile menu toggle
     const menuToggle = document.getElementById('menu-toggle');
-    if (menuToggle) menuToggle.addEventListener('click', toggleSidebar);
+    if (menuToggle) {
+        menuToggle.addEventListener('click', toggleSidebar);
+    }
 });
 
-async function handleLoginRefactored(e) {
-    e.preventDefault();
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
-    const errorDiv = document.getElementById('login-error');
-
-    errorDiv.style.display = 'none';
-    window.UIUtils.showLoading(true);
-
-    try {
-        await window.AuthService.login(username, password);
-        currentUser = window.currentUser;
-        authToken = window.authToken;
-        
-        window.showPage('dashboard-page');
-        window.loadDashboard();
-    } catch (error) {
-        errorDiv.textContent = error.message || 'Error al iniciar sesión';
-        errorDiv.style.display = 'block';
-    } finally {
-        window.UIUtils.showLoading(false);
-    }
-}
-
-// Redefinir funciones legacy para que usen los nuevos servicios
-function showLoading(show) { window.UIUtils.showLoading(show); }
-function formatNumber(num) { return window.UIUtils.formatNumber(num); }
-function formatNumeroGuia(num, letra) { return window.UIUtils.formatNumeroGuia(num, letra); }
-function getEstadoBadge(est) { return window.UIUtils.getEstadoBadge(est); }
-
+// ===== NAVEGACI├âÔÇ£N =====
 function setupNavigation() {
     // Observer for dynamically added links
     const navContainer = document.getElementById('sidebar-nav');
@@ -74,7 +77,7 @@ function setupNavigation() {
         navContainer.addEventListener('click', (e) => {
             const link = e.target.closest('.nav-link');
             if (link) {
-                // Si tiene onclick, dejar que actúe
+                // Si tiene onclick, dejar que act├â┬║e
                 if (link.getAttribute('onclick')) return;
 
                 if (link.dataset.section) {
@@ -117,7 +120,7 @@ function renderSidebar(role) {
     let menuHtml = '';
 
     if (role === 'master') {
-        // MENÚ ADMINISTRADOR (MASTER)
+        // MEN├â┼í ADMINISTRADOR (MASTER)
         menuHtml = `
             <div class="nav-item">
                 <a href="#" class="nav-link active" data-section="inicio">
@@ -128,7 +131,7 @@ function renderSidebar(role) {
             <div class="nav-item">
                 <a href="#" class="nav-link" data-section="guias">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    <span>Todas las Guías</span>
+                    <span>Todas las Gu├â┬¡as</span>
                 </a>
             </div>
             ${systemConfig.modulo_pagos_habilitado === 'true' ? `
@@ -171,23 +174,24 @@ function renderSidebar(role) {
             <div class="nav-item">
                 <a href="#" class="nav-link" data-section="minerales">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                        <line x1="12" y1="22.08" x2="12" y2="12" />
+                        <path d="M12 2l-5.5 9h11L12 2z"/>
+                        <path d="M6 11l-4 7h11l-7-7z"/>
+                        <path d="M18 11l4 7h-11l7-7z"/>
+                        <path d="M12 22v-4"/>
                     </svg>
-                    <span>Gestión de Minerales</span>
+                    <span>Gesti├â┬│n de Minerales</span>
                 </a>
             </div>
             
             <div class="nav-divider" style="height: 1px; background: rgba(0,0,0,0.1); margin: 10px 0;"></div>
         `;
     } else if (role === 'fiscalizador') {
-        // MENÚ FISCALIZADOR
+        // MEN├â┼í FISCALIZADOR
         menuHtml = `
             <div class="nav-item">
                 <a href="#" class="nav-link active" data-section="inicio">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                    <span>Fiscalización</span>
+                    <span>Fiscalizaci├â┬│n</span>
                 </a>
             </div>
             <div class="nav-item">
@@ -199,7 +203,7 @@ function renderSidebar(role) {
             <div class="nav-divider" style="height: 1px; background: rgba(0,0,0,0.1); margin: 10px 0;"></div>
         `;
     } else {
-        // MENÚ EMPRESA
+        // MEN├â┼í EMPRESA
         menuHtml = `
             <div class="nav-item">
                 <a href="#" class="nav-link active" data-section="inicio">
@@ -210,13 +214,13 @@ function renderSidebar(role) {
             <div class="nav-item">
                 <a href="#" class="nav-link" data-section="guias">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    <span>Mis Guías</span>
+                    <span>Mis Gu├â┬¡as</span>
                 </a>
             </div>
             <div class="nav-item">
                 <a href="#" class="nav-link" data-section="solicitar">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                    <span>Solicitar Guía</span>
+                    <span>Solicitar Gu├â┬¡a</span>
                 </a>
             </div>
             ${systemConfig.modulo_pagos_habilitado === 'true' ? `
@@ -290,13 +294,13 @@ function updateBreadcrumb(section) {
     const breadcrumb = document.getElementById('breadcrumb');
     const sectionNames = {
         'inicio': 'Inicio',
-        'guias': 'Mis Guías',
-        'solicitar': 'Solicitar Guía',
+        'guias': 'Mis Gu├â┬¡as',
+        'solicitar': 'Solicitar Gu├â┬¡a',
         'pagos': 'Pagos',
         'deudas': 'Deudas y Recargos',
         'historial': 'Historial',
-        'admin': 'Administración',
-        'minerales': 'Gestión de Minerales'
+        'admin': 'Administraci├â┬│n',
+        'minerales': 'Gesti├â┬│n de Minerales'
     };
 
     breadcrumb.innerHTML = `
@@ -304,7 +308,7 @@ function updateBreadcrumb(section) {
             <a href="#" onclick="navigateToSection('inicio'); return false;">Inicio</a>
         </div>
         ${section !== 'inicio' ? `
-            <span class="breadcrumb-separator">›</span>
+            <span class="breadcrumb-separator">├óÔé¼┬║</span>
             <div class="breadcrumb-item">
                 <span>${sectionNames[section] || section}</span>
             </div>
@@ -361,6 +365,13 @@ function loadSectionContent(section) {
                 content.innerHTML = '<div class="error-message">Acceso denegado</div>';
             }
             break;
+        case 'minerales':
+            if (currentUser.role === 'master') {
+                renderMinerales(content);
+            } else {
+                content.innerHTML = '<div class="error-message">Acceso denegado</div>';
+            }
+            break;
         case 'chofer':
             loadChoferMode(content);
             break;
@@ -380,19 +391,12 @@ function loadSectionContent(section) {
                 content.innerHTML = '<div class="error-message">Acceso denegado</div>';
             }
             break;
-        case 'minerales':
-            if (currentUser.role === 'master') {
-                renderMinerales(content);
-            } else {
-                content.innerHTML = '<div class="error-message">Acceso denegado</div>';
-            }
-            break;
         default:
             loadDashboard();
     }
 }
 
-// ===== AUTENTICACIÓN =====
+// ===== AUTENTICACI├âÔÇ£N =====
 async function handleLogin(e) {
     e.preventDefault();
 
@@ -419,7 +423,7 @@ async function handleLogin(e) {
 
             showPage('dashboard-page');
             
-            // Redirigir según rol
+            // Redirigir seg├â┬║n rol
             if (currentUser.role === 'empresa_destinataria') {
                 loadConfirmacionPage();
             } else if (currentUser.role === 'fiscalizador') {
@@ -428,11 +432,11 @@ async function handleLogin(e) {
                 loadDashboard();
             }
         } else {
-            errorDiv.textContent = data.error || 'Error al iniciar sesión';
+            errorDiv.textContent = data.error || 'Error al iniciar sesi├â┬│n';
             errorDiv.style.display = 'block';
         }
     } catch (error) {
-        errorDiv.textContent = 'Error de conexión. Intente nuevamente.';
+        errorDiv.textContent = 'Error de conexi├â┬│n. Intente nuevamente.';
         errorDiv.style.display = 'block';
     } finally {
         showLoading(false);
@@ -452,7 +456,7 @@ async function verifyToken() {
             currentUser = data.user;
             showPage('dashboard-page');
 
-            // Redirigir según rol
+            // Redirigir seg├â┬║n rol
             if (currentUser.role === 'empresa_destinataria') {
                 loadConfirmacionPage();
             } else if (currentUser.role === 'fiscalizador') {
@@ -481,10 +485,10 @@ async function handleLogout() {
             headers: { 'Authorization': `Bearer ${authToken}` }
         });
     } catch (error) {
-        console.error('Error al cerrar sesión:', error);
+        console.error('Error al cerrar sesi├â┬│n:', error);
     }
 
-    // Restaurar visibilidad de elementos UI antes de cerrar sesión
+    // Restaurar visibilidad de elementos UI antes de cerrar sesi├â┬│n
     const sidebar = document.getElementById('sidebar');
     const header = document.querySelector('.top-header');
     const mobileNav = document.querySelector('.mobile-nav');
@@ -501,14 +505,48 @@ async function handleLogout() {
 
 // ===== DASHBOARD =====
 async function loadDashboard() {
-    await window.DashboardSection.load();
+    // Si es empresa_destinataria, cargar su p├â┬ígina espec├â┬¡fica
+    if (currentUser.role === 'empresa_destinataria') {
+        loadConfirmacionPage();
+        return;
+    }
+
+    // Asegurar que sidebar y header est├â┬®n visibles (pueden haberse ocultado)
+    const sidebar = document.getElementById('sidebar');
+    const header = document.querySelector('.top-header');
+    const mobileNav = document.querySelector('.mobile-nav');
+    if (sidebar) sidebar.style.display = '';
+    if (header) header.style.display = '';
+    if (mobileNav) mobileNav.style.display = '';
+
+    // Update user info in sidebar
+    const avatar = document.getElementById('user-avatar');
+    const username = document.getElementById('sidebar-username');
+    const role = document.getElementById('sidebar-role');
+
+    if (avatar && username && role) {
+        avatar.textContent = currentUser.username.charAt(0).toUpperCase();
+        username.textContent = currentUser.username;
+        role.textContent = currentUser.role === 'master' ? 'Administrador' : currentUser.empresa_nombre;
+    }
+
+    // Render sidebar based on role
+    renderSidebar(currentUser.role);
+
+    const dashboardContent = document.getElementById('dashboard-content');
+
+    if (currentUser.role === 'master') {
+        await loadMasterDashboard(dashboardContent);
+    } else {
+        await loadEmpresaDashboard(dashboardContent);
+    }
 }
 
 async function loadMasterDashboard(container) {
     showLoading(true);
 
     try {
-        // Cargar estadísticas
+        // Cargar estad├â┬¡sticas
         const statsResponse = await apiRequest('/reportes/estadisticas');
         const stats = statsResponse.estadisticas;
 
@@ -516,7 +554,7 @@ async function loadMasterDashboard(container) {
         const pagosResponse = await apiRequest('/pagos/pendientes');
         const pagosPendientes = pagosResponse.pagos;
 
-        // Cargar guías recientes (aumentado para admin)
+        // Cargar gu├â┬¡as recientes (aumentado para admin)
         const guiasResponse = await apiRequest('/guias?limit=50');
         const guias = guiasResponse.guias;
 
@@ -529,7 +567,7 @@ async function loadMasterDashboard(container) {
         container.innerHTML = `
             <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 30px;">
                 <div>
-                    <h1 class="dashboard-title">Panel de Administración</h1>
+                    <h1 class="dashboard-title">Panel de Administraci├â┬│n</h1>
                     <p class="dashboard-subtitle">Control de minerales del Estado La Guaira</p>
                     <button class="btn btn-danger btn-sm" onclick="purgarSistema()" style="margin-top: 10px; background: #dc3545; border: none; font-weight: 600; padding: 8px 15px; border-radius: 8px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(220, 53, 69, 0.2);">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
@@ -539,7 +577,7 @@ async function loadMasterDashboard(container) {
                 
                 <div class="card" style="margin: 0; padding: 15px 25px; border-left: 4px solid #6f42c1; display: flex; align-items: center; gap: 20px; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
                     <div style="display: flex; flex-direction: column;">
-                        <span style="font-size: 14px; font-weight: 700; color: #333;">Módulo de Pagos y Cobranzas</span>
+                        <span style="font-size: 14px; font-weight: 700; color: #333;">M├â┬│dulo de Pagos y Cobranzas</span>
                         <div style="display: flex; align-items: center; gap: 6px;">
                             <span style="width: 8px; height: 8px; border-radius: 50%; background: ${systemConfig.modulo_pagos_habilitado === 'true' ? '#27ae60' : '#e74c3c'};"></span>
                             <span style="font-size: 11px; font-weight: 600; color: #666; text-transform: uppercase;">${systemConfig.modulo_pagos_habilitado === 'true' ? 'Activado' : 'Desactivado'}</span>
@@ -556,7 +594,7 @@ async function loadMasterDashboard(container) {
                 <div class="stat-card stat-primary">
                     <div class="stat-header">
                         <h3 class="stat-title">Empresas Activas</h3>
-                        <div class="stat-icon">🏢</div>
+                        <div class="stat-icon">├░┼©┬Å┬ó</div>
                     </div>
                     <div class="stat-value">${stats.empresas_activas}</div>
                     <div class="stat-change">Empresas registradas</div>
@@ -566,31 +604,31 @@ async function loadMasterDashboard(container) {
                 <div class="stat-card stat-warning">
                     <div class="stat-header">
                         <h3 class="stat-title">Pagos Pendientes</h3>
-                        <div class="stat-icon">⏳</div>
+                        <div class="stat-icon">├ó┬Å┬│</div>
                     </div>
                     <div class="stat-value">${stats.pagos_pendientes}</div>
-                    <div class="stat-change">Pendientes de verificación</div>
+                    <div class="stat-change">Pendientes de verificaci├â┬│n</div>
                 </div>
                 ` : ''}
 
                 <div class="stat-card stat-info">
                     <div class="stat-header">
-                        <h3 class="stat-title">Guías Este Mes</h3>
-                        <div class="stat-icon">📄</div>
+                        <h3 class="stat-title">Gu├â┬¡as Este Mes</h3>
+                        <div class="stat-icon">├░┼©ÔÇ£ÔÇ×</div>
                     </div>
                     <div class="stat-value">${stats.guias_mes}</div>
-                    <div class="stat-change">Guías emitidas</div>
+                    <div class="stat-change">Gu├â┬¡as emitidas</div>
                 </div>
 
                 ${systemConfig.modulo_pagos_habilitado === 'true' ? `
                 <div class="stat-card stat-success" id="income-stat-card" onclick="mostrarDetalleIngresos()" style="cursor: pointer; position: relative; transition: all 0.3s ease;">
                     <div class="stat-header">
                         <h3 class="stat-title" id="income-stat-title">Ingresos del Mes</h3>
-                        <div class="stat-icon">💰</div>
+                        <div class="stat-icon">├░┼©ÔÇÖ┬░</div>
                     </div>
                     <div class="stat-value" id="income-stat-value">Bs. ${formatNumber(stats.ingresos_mes)}</div>
                     <div class="stat-change" id="income-stat-footer">Ver desglose detallado</div>
-                    <div style="position: absolute; top: 10px; right: 10px; font-size: 10px; background: rgba(255,255,255,0.5); padding: 2px 6px; border-radius: 10px; color: var(--system-green); font-weight: 700;">📊 VER MÁS</div>
+                    <div style="position: absolute; top: 10px; right: 10px; font-size: 10px; background: rgba(255,255,255,0.5); padding: 2px 6px; border-radius: 10px; color: var(--system-green); font-weight: 700;">├░┼©ÔÇ£┼á VER M├â┬üS</div>
                 </div>
                 ` : ''}
             </div>
@@ -601,7 +639,7 @@ async function loadMasterDashboard(container) {
             <div class="card" style="background: #f0f7ff; border: 1px solid #cce5ff; margin-bottom: 25px;">
                 <div class="card-body" style="display: flex; align-items: center; justify-content: space-between; padding: 15px 20px;">
                     <div style="display: flex; align-items: center; gap: 15px;">
-                        <div style="font-size: 24px;">📈</div>
+                        <div style="font-size: 24px;">├░┼©ÔÇ£╦å</div>
                         <div>
                             <h3 style="margin: 0; font-size: 16px; color: #004085;">Control de Tasa BCV</h3>
                             <p style="margin: 0; font-size: 13px; color: #004085; opacity: 0.8;">Tasa actual en el sistema: <strong id="current-tasa-display">${tasaBCV.toFixed(2)}</strong> Bs/$</p>
@@ -617,14 +655,14 @@ async function loadMasterDashboard(container) {
             ${systemConfig.modulo_pagos_habilitado === 'true' && pagosPendientes.length > 0 ? `
                 <div class="card" style="background: white; border-radius: 16px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
                     <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 class="card-title" style="font-size: 18px; font-weight: 600;">Pagos Pendientes de Verificación</h2>
+                        <h2 class="card-title" style="font-size: 18px; font-weight: 600;">Pagos Pendientes de Verificaci├â┬│n</h2>
                         <span class="badge badge-warning">${pagosPendientes.length} pendiente(s)</span>
                     </div>
                     <div class="table-wrapper">
                     <table>
                         <thead>
                             <tr>
-                                <th>Guía</th>
+                                <th>Gu├â┬¡a</th>
                                 <th>Empresa</th>
                                 <th>Monto</th>
                                 <th>Banco</th>
@@ -635,7 +673,7 @@ async function loadMasterDashboard(container) {
                         <tbody>
                             ${pagosPendientes.map(pago => `
                                 <tr>
-                                    <td data-label="Guía">${formatNumeroGuia(pago.numero_guia)}</td>
+                                    <td data-label="Gu├â┬¡a">${formatNumeroGuia(pago.numero_guia)}</td>
                                     <td data-label="Empresa">${pago.empresa_nombre}</td>
                                     <td data-label="Monto">Bs. ${formatNumber(pago.monto)}</td>
                                     <td data-label="Banco">${pago.banco}</td>
@@ -650,21 +688,21 @@ async function loadMasterDashboard(container) {
                     </table>
                     </div>
                 </div>
-            ` : '<div class="info-message">✓ No hay pagos pendientes de verificación.</div>'}
+            ` : '<div class="info-message">├ó┼ôÔÇ£ No hay pagos pendientes de verificaci├â┬│n.</div>'}
 
             <div class="card">
                 <div class="card-header">
-                    <h2 class="card-title">📋 Guías Recientes</h2>
+                    <h2 class="card-title">├░┼©ÔÇ£ÔÇ╣ Gu├â┬¡as Recientes</h2>
                     <button class="btn btn-primary btn-sm" onclick="navigateToSection('guias')">Ver Todas</button>
                 </div>
                 <div class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
-                            <th>Número</th>
+                            <th>N├â┬║mero</th>
                             <th>Empresa</th>
                             <th>Mineral</th>
-                            <th>Observación</th>
+                            <th>Observaci├â┬│n</th>
                             <th>Estado</th>
                             ${systemConfig.modulo_pagos_habilitado === 'true' ? '<th>Pendiente</th>' : ''}
                             <th>Acciones</th>
@@ -675,10 +713,10 @@ async function loadMasterDashboard(container) {
                             const pendiente = Math.max(0, (parseFloat(guia.monto_pagar) + parseFloat(guia.recargo_mora || 0)) - parseFloat(guia.monto_pagado || 0));
                             return `
                                 <tr>
-                                    <td data-label="Número">${guia.numero_guia}</td>
+                                    <td data-label="N├â┬║mero">${guia.numero_guia}</td>
                                     <td data-label="Empresa">${guia.empresa_nombre}</td>
                                     <td data-label="Mineral">${guia.tipo_mineral}</td>
-                                    <td data-label="Observación">
+                                    <td data-label="Observaci├â┬│n">
                                         <div style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #666;" title="${guia.observaciones || ''}">
                                             ${guia.observaciones || '<span style="color:#ccc;">Sin obs.</span>'}
                                         </div>
@@ -695,7 +733,7 @@ async function loadMasterDashboard(container) {
                                                 <button class="btn btn-warning btn-sm" onclick="marcarUsada('${guia.id}')" style="padding: 4px 8px; font-size: 11px;">Usada</button>
                                                 <button class="btn btn-danger btn-sm" onclick="anularGuia('${guia.id}')" style="padding: 4px 8px; font-size: 11px;">Anular</button>
                                             ` : ''}
-                                            <button class="btn btn-sm" onclick="eliminarGuia('${guia.id}', '${guia.numero_guia}')" style="padding: 4px 8px; font-size: 11px; background: #2c2c2c; color: white; border: none; border-radius: 4px;">🗑️ Eliminar</button>
+                                            <button class="btn btn-sm" onclick="eliminarGuia('${guia.id}', '${guia.numero_guia}')" style="padding: 4px 8px; font-size: 11px; background: #2c2c2c; color: white; border: none; border-radius: 4px;">├░┼©ÔÇöÔÇÿ├»┬©┬Å Eliminar</button>
                                             ${systemConfig.modulo_pagos_habilitado === 'true' && pendiente > 0 ? `
                                                 <button class="btn btn-primary btn-sm" onclick="exonerarGuia('${guia.id}')" style="padding: 4px 8px; font-size: 11px; background: #6f42c1;">Exonerar</button>
                                             ` : ''}
@@ -718,8 +756,8 @@ async function loadMasterDashboard(container) {
                 if (success) {
                     Swal.fire({
                         icon: 'success',
-                        title: 'Configuración actualizada',
-                        text: `El módulo de pagos ha sido ${enabled ? 'habilitado' : 'deshabilitado'}.`,
+                        title: 'Configuraci├â┬│n actualizada',
+                        text: `El m├â┬│dulo de pagos ha sido ${enabled ? 'habilitado' : 'deshabilitado'}.`,
                         timer: 2000,
                         showConfirmButton: false
                     }).then(() => {
@@ -740,26 +778,26 @@ async function loadMasterDashboard(container) {
 
 // ===== MODO CHOFER (TRACKING) =====
 async function loadChoferMode(container) {
-    // Verificar si tiene guía activa
+    // Verificar si tiene gu├â┬¡a activa
     let guiaActiva = null;
     try {
         const response = await apiRequest('/guias');
         const guias = response.guias;
         guiaActiva = guias.find(g => g.estado === 'activa');
     } catch (e) {
-        console.error("Error buscando guías", e);
+        console.error("Error buscando gu├â┬¡as", e);
     }
 
     if (!guiaActiva) {
         container.innerHTML = `
             <div class="dashboard-header">
-                <h1 class="dashboard-title">🚚 Modo Chofer</h1>
+                <h1 class="dashboard-title">├░┼©┼í┼í Modo Chofer</h1>
             </div>
             <div class="card">
                 <div class="card-body text-center" style="padding: 40px;">
-                    <h3>⛔ No tienes ninguna guía ACTIVA</h3>
-                    <p>Necesitas una guía con pago verificado y estado 'activa' para iniciar el rastreo.</p>
-                    <button class="btn btn-primary mt-3" onclick="navigateToSection('guias')">Ver mis guías</button>
+                    <h3>├óÔÇ║ÔÇØ No tienes ninguna gu├â┬¡a ACTIVA</h3>
+                    <p>Necesitas una gu├â┬¡a con pago verificado y estado 'activa' para iniciar el rastreo.</p>
+                    <button class="btn btn-primary mt-3" onclick="navigateToSection('guias')">Ver mis gu├â┬¡as</button>
                 </div>
             </div>
         `;
@@ -768,20 +806,20 @@ async function loadChoferMode(container) {
 
     container.innerHTML = `
         <div class="dashboard-header">
-            <h1 class="dashboard-title">🚚 En Ruta</h1>
-            <p class="dashboard-subtitle">Guía ${formatNumeroGuia(guiaActiva.numero_guia)} - ${guiaActiva.tipo_mineral}</p>
+            <h1 class="dashboard-title">├░┼©┼í┼í En Ruta</h1>
+            <p class="dashboard-subtitle">Gu├â┬¡a ${formatNumeroGuia(guiaActiva.numero_guia)} - ${guiaActiva.tipo_mineral}</p>
         </div>
 
         <div class="card">
             <div class="card-body text-center" style="padding: 40px;">
-                <div id="tracking-status-icon" style="font-size: 64px; margin-bottom: 20px;">⭕</div>
-                <h2 id="tracking-status-text">Esperando señal GPS...</h2>
-                <p class="text-muted">Por favor, mantén esta pantalla abierta durante todo el viaje.</p>
+                <div id="tracking-status-icon" style="font-size: 64px; margin-bottom: 20px;">├ó┬¡ÔÇó</div>
+                <h2 id="tracking-status-text">Esperando se├â┬▒al GPS...</h2>
+                <p class="text-muted">Por favor, mant├â┬®n esta pantalla abierta durante todo el viaje.</p>
                 
                 <div id="tracking-details" style="margin-top: 20px; font-family: monospace; display: none;">
                     <div>Lat: <span id="track-lat">--</span></div>
                     <div>Lng: <span id="track-lng">--</span></div>
-                    <div>Última act: <span id="track-time">--</span></div>
+                    <div>├â┼íltima act: <span id="track-time">--</span></div>
                 </div>
 
                 <div style="margin-top: 30px;">
@@ -806,7 +844,7 @@ function toggleTracking(guiaId) {
 
 function startTracking(guiaId) {
     if (!navigator.geolocation) {
-        alert("Tu navegador no soporta geolocalización.");
+        alert("Tu navegador no soporta geolocalizaci├â┬│n.");
         return;
     }
 
@@ -819,8 +857,8 @@ function startTracking(guiaId) {
     btn.classList.remove('btn-success');
     btn.classList.add('btn-danger');
 
-    icon.textContent = "📡";
-    text.textContent = "Buscando satélites...";
+    icon.textContent = "├░┼©ÔÇ£┬í";
+    text.textContent = "Buscando sat├â┬®lites...";
 
     // Solicitar permiso y watch
     const geoOptions = {
@@ -834,8 +872,8 @@ function startTracking(guiaId) {
             const { latitude, longitude, speed, accuracy } = position.coords;
 
             // Actualizar UI
-            icon.textContent = "🟢";
-            text.textContent = "TRANSMITIENDO UBICACIÓN";
+            icon.textContent = "├░┼©┼©┬ó";
+            text.textContent = "TRANSMITIENDO UBICACI├âÔÇ£N";
             text.style.color = "#28a745";
 
             details.style.display = 'block';
@@ -844,7 +882,7 @@ function startTracking(guiaId) {
             document.getElementById('track-time').textContent = new Date().toLocaleTimeString();
 
             // Enviar a servidor (Throttle: cada 30s)
-            // Aquí usamos un flag simple o timestamp para no saturar
+            // Aqu├â┬¡ usamos un flag simple o timestamp para no saturar
             const now = Date.now();
             if (!window.lastSent || (now - window.lastSent > 30000)) {
                 sendLocationUpdate(guiaId, latitude, longitude, speed, accuracy);
@@ -853,7 +891,7 @@ function startTracking(guiaId) {
         },
         (error) => {
             console.error("Error GPS:", error);
-            icon.textContent = "⚠️";
+            icon.textContent = "├ó┼í┬á├»┬©┬Å";
             text.textContent = "Error de GPS: " + error.message;
             text.style.color = "#dc3545";
         },
@@ -881,8 +919,8 @@ function stopTracking() {
         btn.textContent = "REANUDAR VIAJE";
         btn.classList.add('btn-success');
         btn.classList.remove('btn-danger');
-        icon.textContent = "⭕";
-        text.textContent = "Transmisión detenida";
+        icon.textContent = "├ó┬¡ÔÇó";
+        text.textContent = "Transmisi├â┬│n detenida";
         text.style.color = "inherit";
     }
 }
@@ -896,9 +934,9 @@ async function sendLocationUpdate(guiaId, lat, lng, speed, accuracy) {
             velocidad: speed,
             precision: accuracy
         });
-        console.log("📍 Ubicación enviada");
+        console.log("├░┼©ÔÇ£┬ì Ubicaci├â┬│n enviada");
     } catch (e) {
-        console.error("Error enviando ubicación", e);
+        console.error("Error enviando ubicaci├â┬│n", e);
     }
 }
 
@@ -907,10 +945,10 @@ async function loadMasterMap(container) {
     container.innerHTML = `
         <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-                <h1 class="dashboard-title">🗺️ Monitor Satelital</h1>
+                <h1 class="dashboard-title">├░┼©ÔÇö┬║├»┬©┬Å Monitor Satelital</h1>
                 <p class="dashboard-subtitle">Seguimiento en tiempo real</p>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="loadMasterMap(document.getElementById('dashboard-content'))">🔄 Actualizar</button>
+            <button class="btn btn-secondary btn-sm" onclick="loadMasterMap(document.getElementById('dashboard-content'))">├░┼©ÔÇØÔÇ× Actualizar</button>
         </div>
         <div class="card" style="height: 600px; padding: 0; overflow: hidden;">
             <div id="map" style="width: 100%; height: 100%;"></div>
@@ -919,17 +957,12 @@ async function loadMasterMap(container) {
 
     // Esperar a que renderice DOM
     setTimeout(async () => {
-        // Limpiar instancia previa si existe
-        const mapContainer = L.DomUtil.get('map');
-        if (mapContainer && mapContainer._leaflet_id) {
-            mapContainer._leaflet_id = null;
-        }
-
         // Inicializar Mapa
+        // Coordenadas Estado La Guaira aprox
         const map = L.map('map').setView([10.599, -66.935], 11);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
+            attribution: '├é┬® OpenStreetMap contributors'
         }).addTo(map);
 
         // Cargar posiciones
@@ -943,9 +976,9 @@ async function loadMasterMap(container) {
                 const popupContent = `
                     <div style="min-width: 200px;">
                         <strong>${pos.empresa}</strong><br>
-                        Guía: ${formatNumeroGuia(pos.numero_guia)}<br>
+                        Gu├â┬¡a: ${formatNumeroGuia(pos.numero_guia)}<br>
                         Placa: ${pos.vehiculo_placa}<br>
-                        <small>🕒 ${new Date(pos.timestamp).toLocaleTimeString()}</small><br>
+                        <small>├░┼©ÔÇóÔÇÖ ${new Date(pos.timestamp).toLocaleTimeString()}</small><br>
                         <hr style="margin: 5px 0;">
                         <button class="btn btn-primary btn-sm" style="width: 100%" 
                             onclick="verDetalleGuiaMaster('${pos.guia_id}')">
@@ -968,14 +1001,14 @@ async function loadMasterMap(container) {
     }, 100);
 }
 
-// Función auxiliar para redirigir desde mapa
+// Funci├â┬│n auxiliar para redirigir desde mapa
 window.verDetalleGuiaMaster = function (guiaId) {
-    // Implementar vista de detalle específica o usar modal
-    // Por ahora simulamos búsqueda
+    // Implementar vista de detalle espec├â┬¡fica o usar modal
+    // Por ahora simulamos b├â┬║squeda
     loadDetalleGuiaMaster(guiaId);
 };
 
-// Cargar vista detalle para Master (con botón de cierre remoto)
+// Cargar vista detalle para Master (con bot├â┬│n de cierre remoto)
 async function loadDetalleGuiaMaster(guiaId) {
     const container = document.getElementById('dashboard-content');
     showLoading(true);
@@ -987,8 +1020,8 @@ async function loadDetalleGuiaMaster(guiaId) {
         container.innerHTML = `
             <div class="dashboard-header">
                 <div>
-                    <h1 class="dashboard-title">Detalle de Guía ${formatNumeroGuia(guia.numero_guia)}</h1>
-                    <button class="btn btn-outline btn-sm" onclick="loadMasterMap(document.getElementById('dashboard-content'))">⬅ Volver al Mapa</button>
+                    <h1 class="dashboard-title">Detalle de Gu├â┬¡a ${formatNumeroGuia(guia.numero_guia)}</h1>
+                    <button class="btn btn-outline btn-sm" onclick="loadMasterMap(document.getElementById('dashboard-content'))">├ó┬¼ÔÇª Volver al Mapa</button>
                 </div>
             </div>
 
@@ -1021,7 +1054,7 @@ async function loadDetalleGuiaMaster(guiaId) {
                     <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 20px;">
                         ${guia.estado === 'activa' ? `
                             <button class="btn btn-danger btn-lg" onclick="cerrarGuiaRemoto('${guia.id}')">
-                                🛑 CONFIRMAR LLEGADA Y CERRAR
+                                ├░┼©ÔÇ║ÔÇÿ CONFIRMAR LLEGADA Y CERRAR
                             </button>
                         ` : ''}
                         <button class="btn btn-secondary" onclick="descargarGuia('${guia.id}')">Ver PDF</button>
@@ -1039,7 +1072,7 @@ async function loadDetalleGuiaMaster(guiaId) {
 }
 
 async function cerrarGuiaRemoto(guiaId) {
-    if (!confirm("¿CONFIRMA que el transporte ha llegado a su destino?\n\nEsta acción cerrará la guía permanentemente.")) return;
+    if (!confirm("├é┬┐CONFIRMA que el transporte ha llegado a su destino?\n\nEsta acci├â┬│n cerrar├â┬í la gu├â┬¡a permanentemente.")) return;
 
     showLoading(true);
     try {
@@ -1056,7 +1089,7 @@ async function cerrarGuiaRemoto(guiaId) {
             alert(response.message);
         }
     } catch (e) {
-        alert("Error cerrando guía: " + e.message);
+        alert("Error cerrando gu├â┬¡a: " + e.message);
     } finally {
         showLoading(false);
     }
@@ -1066,7 +1099,7 @@ async function loadEmpresaDashboard(container) {
     showLoading(true);
 
     try {
-        // Cargar guías de la empresa
+        // Cargar gu├â┬¡as de la empresa
         const guiasResponse = await apiRequest('/guias');
         const guias = guiasResponse.guias;
 
@@ -1074,7 +1107,7 @@ async function loadEmpresaDashboard(container) {
         const pagosResponse = await apiRequest('/pagos/historial');
         const pagos = pagosResponse.pagos;
 
-        // Contar guías por estado
+        // Contar gu├â┬¡as por estado
         const guiasActivas = guias.filter(g => g.estado === 'activa').length;
         const guiasPendientes = guias.filter(g => g.estado === 'pendiente_pago' || g.estado === 'pago_pendiente_verificacion').length;
 
@@ -1083,16 +1116,16 @@ async function loadEmpresaDashboard(container) {
                 <h1 class="dashboard-title">Panel de Empresa</h1>
                 <p class="dashboard-subtitle">Bienvenido, ${currentUser.empresa_nombre}</p>
                 <button class="btn btn-primary mt-2" onclick="mostrarFormularioGuia()">
-                    <span>➕</span>
-                    Solicitar Nueva Guía
+                    <span>├ó┼¥ÔÇó</span>
+                    Solicitar Nueva Gu├â┬¡a
                 </button>
             </div>
             
             <div class="stats-grid">
                 <div class="stat-card stat-primary">
                     <div class="stat-header">
-                        <h3 class="stat-title">Guías Solicitadas</h3>
-                        <div class="stat-icon">📄</div>
+                        <h3 class="stat-title">Gu├â┬¡as Solicitadas</h3>
+                        <div class="stat-icon">├░┼©ÔÇ£ÔÇ×</div>
                     </div>
                     <div class="stat-value">${guias.length}</div>
                     <div class="stat-change">Total de solicitudes</div>
@@ -1100,7 +1133,7 @@ async function loadEmpresaDashboard(container) {
                 <div class="stat-card stat-warning">
                     <div class="stat-header">
                         <h3 class="stat-title">Pendientes</h3>
-                        <div class="stat-icon">⏳</div>
+                        <div class="stat-icon">├ó┬Å┬│</div>
                     </div>
                     <div class="stat-value">${guiasPendientes}</div>
                     <div class="stat-change">Por pagar o verificar</div>
@@ -1110,7 +1143,7 @@ async function loadEmpresaDashboard(container) {
             ${guias.length > 0 ? `
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">📄 Mis Guías de Movilización</h2>
+                        <h2 class="card-title">├░┼©ÔÇ£ÔÇ× Mis Gu├â┬¡as de Movilizaci├â┬│n</h2>
                     </div>
                     <div class="card-body">
                         ${guias.slice(0, 5).map(guia => `
@@ -1121,7 +1154,7 @@ async function loadEmpresaDashboard(container) {
                                             <div class="guia-number" style="margin-bottom: 0;">${formatNumeroGuia(guia.numero_guia)}</div>
                                             ${guia.estado === 'activa' || guia.estado === 'pendiente_pago' || guia.estado === 'pago_pendiente_verificacion' ? `
                                                 <button class="btn btn-success btn-sm" onclick="descargarGuia('${guia.id}')" style="padding: 4px 10px; font-size: 11px; height: fit-content; display: flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px rgba(52, 199, 89, 0.2);">
-                                                    <span style="font-size: 12px;">📥</span> PDF
+                                                    <span style="font-size: 12px;">├░┼©ÔÇ£┬Ñ</span> PDF
                                                 </button>
                                             ` : ''}
                                         </div>
@@ -1129,7 +1162,7 @@ async function loadEmpresaDashboard(container) {
                                     </div>
                                     <div class="guia-qr">
                                         <div style="font-size: 12px; text-align: center; color: #6c757d;">
-                                            📱<br>QR Code
+                                            ├░┼©ÔÇ£┬▒<br>QR Code
                                         </div>
                                     </div>
                                 </div>
@@ -1157,14 +1190,14 @@ async function loadEmpresaDashboard(container) {
                                     <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                                         ${(parseFloat(guia.monto_pagado || 0) < (parseFloat(guia.monto_pagar) + parseFloat(guia.monto_recargo || 0))) ? `
                                             <button class="btn btn-primary btn-sm" onclick="subirComprobante('${guia.id}', ${(parseFloat(guia.monto_pagar) + parseFloat(guia.monto_recargo || 0)) - parseFloat(guia.monto_pagado || 0)})">
-                                                <span>💳</span> Pagar
+                                                <span>├░┼©ÔÇÖ┬│</span> Pagar
                                             </button>
                                         ` : `
-                                            <span class="badge badge-success">✅ Pagada</span>
+                                            <span class="badge badge-success">├ó┼ôÔÇª Pagada</span>
                                         `}
 
                                         ${guia.estado === 'pago_pendiente_verificacion' ? `
-                                            <span class="badge badge-info">⏳ En Verificación</span>
+                                            <span class="badge badge-info">├ó┬Å┬│ En Verificaci├â┬│n</span>
                                         ` : ''}
                                     </div>
                                 </div>
@@ -1174,7 +1207,7 @@ async function loadEmpresaDashboard(container) {
                     ${guias.length > 5 ? `
                         <div class="card-footer">
                             <button class="btn btn-outline btn-sm" onclick="navigateToSection('guias')">
-                                Ver todas las guías (${guias.length})
+                                Ver todas las gu├â┬¡as (${guias.length})
                             </button>
                         </div>
                     ` : ''}
@@ -1182,12 +1215,12 @@ async function loadEmpresaDashboard(container) {
             ` : `
                 <div class="card">
                     <div class="card-body text-center" style="padding: 60px 20px;">
-                        <div style="font-size: 64px; margin-bottom: 20px;">📄</div>
-                        <h3 style="color: #6c757d; margin-bottom: 10px;">No tienes guías registradas</h3>
-                        <p style="color: #adb5bd; margin-bottom: 30px;">Solicita tu primera guía de movilización</p>
+                        <div style="font-size: 64px; margin-bottom: 20px;">├░┼©ÔÇ£ÔÇ×</div>
+                        <h3 style="color: #6c757d; margin-bottom: 10px;">No tienes gu├â┬¡as registradas</h3>
+                        <p style="color: #adb5bd; margin-bottom: 30px;">Solicita tu primera gu├â┬¡a de movilizaci├â┬│n</p>
                         <button class="btn btn-primary" onclick="mostrarFormularioGuia()">
-                            <span>➕</span>
-                            Solicitar Nueva Guía
+                            <span>├ó┼¥ÔÇó</span>
+                            Solicitar Nueva Gu├â┬¡a
                         </button>
                     </div>
                 </div>
@@ -1238,8 +1271,8 @@ async function loadGuiasSection(container) {
 
             container.innerHTML = `
                 <div class="dashboard-header">
-                    <h1 class="dashboard-title">🏢 Gestión de Guías</h1>
-                    <p class="dashboard-subtitle">Visualización consolidada por empresas</p>
+                    <h1 class="dashboard-title">├░┼©┬Å┬ó Gesti├â┬│n de Gu├â┬¡as</h1>
+                    <p class="dashboard-subtitle">Visualizaci├â┬│n consolidada por empresas</p>
                 </div>
 
                 <div class="stats-grid">
@@ -1247,7 +1280,7 @@ async function loadGuiasSection(container) {
                     <div class="stat-card stat-danger">
                         <div class="stat-header">
                             <span class="stat-title">DEUDA TOTAL POR COBRAR</span>
-                            <div class="stat-icon">💰</div>
+                            <div class="stat-icon">├░┼©ÔÇÖ┬░</div>
                         </div>
                         <div class="stat-value">Bs. ${formatNumber(deudaTotalFisica)}</div>
                         <div class="stat-change">Sumatoria de todas las empresas</div>
@@ -1256,10 +1289,10 @@ async function loadGuiasSection(container) {
                     <div class="stat-card stat-primary">
                         <div class="stat-header">
                             <span class="stat-title">EMPRESAS ACTIVAS</span>
-                            <div class="stat-icon">🏭</div>
+                            <div class="stat-icon">├░┼©┬Å┬¡</div>
                         </div>
                         <div class="stat-value">${Object.keys(empresasMap).length}</div>
-                        <div class="stat-change">Con guías generadas</div>
+                        <div class="stat-change">Con gu├â┬¡as generadas</div>
                     </div>
                 </div>
 
@@ -1323,8 +1356,8 @@ async function loadGuiasSection(container) {
             // VISTA EMPRESA
             container.innerHTML = `
                 <div class="dashboard-header">
-                    <h1 class="dashboard-title">📄 Mis Guías</h1>
-                    <p class="dashboard-subtitle">Todas tus guías de movilización</p>
+                    <h1 class="dashboard-title">├░┼©ÔÇ£ÔÇ× Mis Gu├â┬¡as</h1>
+                    <p class="dashboard-subtitle">Todas tus gu├â┬¡as de movilizaci├â┬│n</p>
                 </div>
                 
                 <div class="guias-container">
@@ -1341,7 +1374,7 @@ async function loadGuiasSection(container) {
                                                 </div>
                                                 <div class="guia-qr" onclick="window.open('/verificar/${guia.id}', '_blank')" style="cursor: pointer;">
                                                     <div style="font-size: 12px; text-align: center; color: #6c757d;">
-                                                        📱<br>QR Code
+                                                        ├░┼©ÔÇ£┬▒<br>QR Code
                                                     </div>
                                                 </div>
                                             </div>
@@ -1363,21 +1396,21 @@ async function loadGuiasSection(container) {
                                                 <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
                                                     ${guia.estado === 'activa' || guia.estado === 'pendiente_pago' || guia.estado === 'pago_pendiente_verificacion' ? `
                                                         <button class="btn btn-success btn-sm" onclick="descargarGuia('${guia.id}')">
-                                                            <span>📥</span> PDF
+                                                            <span>├░┼©ÔÇ£┬Ñ</span> PDF
                                                         </button>
                                                     ` : ''}
                                                     
                                                     ${systemConfig.modulo_pagos_habilitado === 'true' ? `
                                                         ${(parseFloat(guia.monto_pagado || 0) < (parseFloat(guia.monto_pagar) + parseFloat(guia.monto_recargo || 0))) ? `
                                                             <button class="btn btn-primary btn-sm" onclick="subirComprobante('${guia.id}', ${(parseFloat(guia.monto_pagar) + parseFloat(guia.monto_recargo || 0)) - parseFloat(guia.monto_pagado || 0)})">
-                                                                <span>💳</span> Pagar
+                                                                <span>├░┼©ÔÇÖ┬│</span> Pagar
                                                             </button>
                                                         ` : `
-                                                            <span class="badge badge-success">✅ Pagada</span>
+                                                            <span class="badge badge-success">├ó┼ôÔÇª Pagada</span>
                                                         `}
 
                                                         ${guia.estado === 'pago_pendiente_verificacion' ? `
-                                                            <span class="badge badge-info">⏳ En Verificación</span>
+                                                            <span class="badge badge-info">├ó┬Å┬│ En Verificaci├â┬│n</span>
                                                         ` : ''}
                                                     ` : ''}
                                                 </div>
@@ -1387,7 +1420,7 @@ async function loadGuiasSection(container) {
                                 </div>
                             </div>
                         ` : `
-                            <div class="info-message">No hay guías registradas</div>
+                            <div class="info-message">No hay gu├â┬¡as registradas</div>
                         `}
                     </div>
 
@@ -1419,9 +1452,9 @@ async function loadGuiasSection(container) {
                         </div>
 
                         <div class="card" style="margin-top: 20px; border-left: 4px solid var(--system-orange); padding: 16px;">
-                            <h4 style="font-size: 14px; margin-bottom: 8px; color: var(--system-orange);">ℹ️ Información Importante</h4>
+                            <h4 style="font-size: 14px; margin-bottom: 8px; color: var(--system-orange);">├óÔÇ×┬╣├»┬©┬Å Informaci├â┬│n Importante</h4>
                             <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
-                                Las guías pueden descargarse de 8:00 AM a 6:00 PM. 
+                                Las gu├â┬¡as pueden descargarse de 8:00 AM a 6:00 PM. 
                                 <strong>Los pagos deben realizarse antes de las 6:00 PM</strong> para evitar recargos por retraso.
                             </p>
                         </div>
@@ -1432,7 +1465,7 @@ async function loadGuiasSection(container) {
         }
     } catch (error) {
         console.error('Error loading guias:', error);
-        container.innerHTML = '<div class="error-message">Error al cargar las guías</div>';
+        container.innerHTML = '<div class="error-message">Error al cargar las gu├â┬¡as</div>';
     } finally {
         showLoading(false);
     }
@@ -1449,8 +1482,8 @@ async function loadPagosSection(container) {
 
         container.innerHTML = `
             <div class="dashboard-header">
-                <h1 class="dashboard-title">${isMaster ? '💳 Pagos por Verificar' : '💳 Mis Pagos'}</h1>
-                <p class="dashboard-subtitle">${isMaster ? 'Listado de comprobantes de pago pendientes de aprobación' : 'Historial de pagos realizados'}</p>
+                <h1 class="dashboard-title">${isMaster ? '├░┼©ÔÇÖ┬│ Pagos por Verificar' : '├░┼©ÔÇÖ┬│ Mis Pagos'}</h1>
+                <p class="dashboard-subtitle">${isMaster ? 'Listado de comprobantes de pago pendientes de aprobaci├â┬│n' : 'Historial de pagos realizados'}</p>
             </div>
 
             <div class="card">
@@ -1470,7 +1503,7 @@ async function loadPagosSection(container) {
                                 <tr>
                                     <th>Fecha Registro</th>
                                     ${isMaster ? '<th>Empresa</th>' : ''}
-                                    <th>Guía</th>
+                                    <th>Gu├â┬¡a</th>
                                     <th>Banco / Referencia</th>
                                     <th>Monto</th>
                                     <th>Estado</th>
@@ -1494,14 +1527,14 @@ async function loadPagosSection(container) {
                                         <td>
                                             <div style="display: flex; flex-direction: column; gap: 5px;">
                                                 <button class="btn btn-primary btn-sm" onclick="verComprobante('${pago.comprobante_url}')">
-                                                    📸 Ver Captura
+                                                    ├░┼©ÔÇ£┬© Ver Captura
                                                 </button>
                                                 <div style="display: flex; gap: 5px;">
                                                     <button class="btn btn-success btn-sm" style="flex: 1;" onclick="verificarPago('${pago.id}')">
-                                                        ✅ Aprobar
+                                                        ├ó┼ôÔÇª Aprobar
                                                     </button>
                                                     <button class="btn btn-danger btn-sm" style="flex: 1;" onclick="rechazarPago('${pago.id}')">
-                                                        ❌ Rechazar
+                                                        ├ó┬Ø┼Æ Rechazar
                                                     </button>
                                                 </div>
                                             </div>
@@ -1517,7 +1550,7 @@ async function loadPagosSection(container) {
         `;
 
     } catch (error) {
-        container.innerHTML = `<div class="error-message">Error al cargar la sección de pagos.</div>`;
+        container.innerHTML = `<div class="error-message">Error al cargar la secci├â┬│n de pagos.</div>`;
         console.error(error);
     } finally {
         showLoading(false);
@@ -1542,11 +1575,11 @@ async function loadDeudasSection(container) {
     if (systemConfig.modulo_pagos_habilitado === 'false') {
         container.innerHTML = `
             <div class="dashboard-header">
-                <h1 class="dashboard-title">💰 Deudas y Recargos</h1>
+                <h1 class="dashboard-title">├░┼©ÔÇÖ┬░ Deudas y Recargos</h1>
             </div>
             <div class="card" style="padding: 40px; text-align: center;">
-                <div style="font-size: 48px; margin-bottom: 20px;">🛡️</div>
-                <h2>Módulo Deshabilitado</h2>
+                <div style="font-size: 48px; margin-bottom: 20px;">├░┼©ÔÇ║┬í├»┬©┬Å</div>
+                <h2>M├â┬│dulo Deshabilitado</h2>
                 <p style="color: #666; margin-top: 10px;">El sistema de pagos y cobranzas ha sido desactivado temporalmente por el administrador.</p>
                 <button class="btn btn-primary mt-3" onclick="navigateToSection('inicio')">Volver al Inicio</button>
             </div>
@@ -1569,14 +1602,14 @@ async function loadDeudasSection(container) {
 
         container.innerHTML = `
             <div class="dashboard-header">
-                <h1 class="dashboard-title">${isMaster ? '⚖️ Control de Deudas y Recargos' : '⚖️ Mis Deudas'}</h1>
-                <p class="dashboard-subtitle">${isMaster ? 'Seguimiento de guías pendientes con recargos por mora' : 'Estado de cuenta de tus guías pendientes de pago'}</p>
+                <h1 class="dashboard-title">${isMaster ? '├ó┼íÔÇô├»┬©┬Å Control de Deudas y Recargos' : '├ó┼íÔÇô├»┬©┬Å Mis Deudas'}</h1>
+                <p class="dashboard-subtitle">${isMaster ? 'Seguimiento de gu├â┬¡as pendientes con recargos por mora' : 'Estado de cuenta de tus gu├â┬¡as pendientes de pago'}</p>
             </div>
 
             <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 24px;">
                 <div class="stat-card">
                     <div class="stat-value">${deudas.length}</div>
-                    <div class="stat-label">Guías Pendientes</div>
+                    <div class="stat-label">Gu├â┬¡as Pendientes</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" style="color: var(--system-orange);">Bs. ${formatNumber(totalRecargos)}</div>
@@ -1592,7 +1625,7 @@ async function loadDeudasSection(container) {
                                 onclick="subirComprobante('deuda_total', ${totalGeneral})"
                                 onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(0,0,0,0.2)'"
                                 onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 15px rgba(0,0,0,0.1)'">
-                            💳 Pagar Deuda Total
+                            ├░┼©ÔÇÖ┬│ Pagar Deuda Total
                         </button>
                     ` : ''}
                 </div>
@@ -1600,15 +1633,15 @@ async function loadDeudasSection(container) {
 
             <div class="card">
                 <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2 class="card-title">Detalle de Deuda por Guía</h2>
+                    <h2 class="card-title">Detalle de Deuda por Gu├â┬¡a</h2>
                     <span class="badge badge-primary">${deudas.length} Registro(s)</span>
                 </div>
 
                 ${deudas.length === 0 ? `
                     <div class="card-body text-center" style="padding: 40px;">
-                        <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
-                        <p style="color: #666; font-size: 18px; font-weight: 600;">¡No tienes deudas pendientes!</p>
-                        <p style="color: #999;">Todas tus guías solicitadas han sido pagadas o no hay registros.</p>
+                        <div style="font-size: 48px; margin-bottom: 16px;">├ó┼ôÔÇª</div>
+                        <p style="color: #666; font-size: 18px; font-weight: 600;">├é┬íNo tienes deudas pendientes!</p>
+                        <p style="color: #999;">Todas tus gu├â┬¡as solicitadas han sido pagadas o no hay registros.</p>
                     </div>
                 ` : `
                     <div class="table-wrapper">
@@ -1617,7 +1650,7 @@ async function loadDeudasSection(container) {
                                 <tr>
                                     <th>Fecha Solicitud</th>
                                     ${isMaster ? '<th>Empresa</th>' : ''}
-                                    <th>Guía</th>
+                                    <th>Gu├â┬¡a</th>
                                     <th>Monto Base</th>
                                     <th>Recargo (10%)</th>
                                     <th>Abonado</th>
@@ -1637,7 +1670,7 @@ async function loadDeudasSection(container) {
                                             <td>
                                                 ${formatDate(guia.created_at)}
                                                 <br><small style="color: ${tieneRecargo ? '#e74c3c' : '#888'}; font-weight: ${tieneRecargo ? '700' : '400'};">
-                                                    ${tieneRecargo ? '⚠️ MÁS DE 24H' : '⏱️ En plazo'}
+                                                    ${tieneRecargo ? '├ó┼í┬á├»┬©┬Å M├â┬üS DE 24H' : '├ó┬Å┬▒├»┬©┬Å En plazo'}
                                                 </small>
                                             </td>
                                             ${isMaster ? `<td>${guia.empresa_nombre}</td>` : ''}
@@ -1654,7 +1687,7 @@ async function loadDeudasSection(container) {
                                             </td>
                                             <td>
                                                 <button class="btn btn-primary btn-sm" onclick="subirComprobante('${guia.id}', ${pendiente})">
-                                                    💳 ${abonado > 0 ? 'Abonar' : 'Pagar'}
+                                                    ├░┼©ÔÇÖ┬│ ${abonado > 0 ? 'Abonar' : 'Pagar'}
                                                 </button>
                                             </td>
                                         </tr>
@@ -1668,12 +1701,12 @@ async function loadDeudasSection(container) {
             
             <div class="card" style="margin-top: 24px; background: #fffcf0; border: 1px solid #ffeeba;">
                 <div class="card-body" style="display: flex; gap: 16px; align-items: flex-start; padding: 20px;">
-                    <div style="font-size: 24px;">🔔</div>
+                    <div style="font-size: 24px;">├░┼©ÔÇØÔÇØ</div>
                     <div>
-                        <h4 style="color: #856404; margin-bottom: 4px; font-weight: 700;">Política de Recargos</h4>
+                        <h4 style="color: #856404; margin-bottom: 4px; font-weight: 700;">Pol├â┬¡tica de Recargos</h4>
                         <p style="font-size: 13px; color: #856404; line-height: 1.5; margin: 0;">
-                            Recuerde que dispone de <strong>24 horas</strong> desde la solicitud de la guía para realizar el pago. 
-                            Pasado este tiempo, el sistema aplica automáticamente un recargo del <strong>10%</strong> sobre el monto total de la guía por concepto de mora administrativa.
+                            Recuerde que dispone de <strong>24 horas</strong> desde la solicitud de la gu├â┬¡a para realizar el pago. 
+                            Pasado este tiempo, el sistema aplica autom├â┬íticamente un recargo del <strong>10%</strong> sobre el monto total de la gu├â┬¡a por concepto de mora administrativa.
                         </p>
                     </div>
                 </div>
@@ -1682,7 +1715,7 @@ async function loadDeudasSection(container) {
 
     } catch (error) {
         console.error('Error loading deudas:', error);
-        container.innerHTML = '<div class="error-message">Error al cargar la sección de deudas</div>';
+        container.innerHTML = '<div class="error-message">Error al cargar la secci├â┬│n de deudas</div>';
     } finally {
         showLoading(false);
     }
@@ -1717,40 +1750,50 @@ function updateNotificationBadge(count) {
 }
 
 
-// Lista de materiales disponibles (cargada dinámicamente desde API)
-window.DYNAMIC_MINERALS = [];
+// ===== FUNCIONES DE GU├â┬ìAS =====
+// Lista de materiales disponibles
+let MATERIALES_DISPONIBLES = [
+    'Piedra Picada', 'Arrocillo', 'Arena 2"', 'Arena 2/4', 'Arena 5"',
+    'Agregado 4/8', 'Agregado 8/15', 'Agregado 5/15', 'Agregado 15/25',
+    'Arena Integral', 'Granz├â┬│n', 'P100', 'P3000', 'Coraza',
+    'Arena Cernida', 'Canto Rodado', 'Polvillo', 'Arena Amarilla', 'Arena Lavada', 'Otros'
+];
 
 async function mostrarFormularioGuia() {
     showLoading(true);
-    
     try {
-        const response = await apiRequest('/minerales');
-        if (response.success && response.minerales) {
-            window.DYNAMIC_MINERALS = response.minerales;
+        const response = await fetch(`${API_BASE}/minerales`);
+        const data = await response.json();
+        
+        if (data.success && data.minerales && data.minerales.length > 0) {
+            MATERIALES_DISPONIBLES = data.minerales.map(m => m.nombre);
         }
-    } catch (e) {
-        console.error("Error cargando minerales para formulario", e);
-        window.DYNAMIC_MINERALS = [];
+    } catch (err) {
+        console.error('Error al cargar minerales din├ímicos:', err);
     } finally {
         showLoading(false);
     }
+
+    const materialesOptions = MATERIALES_DISPONIBLES.map(m =>
+        `<option value="${m}">${m}</option>`
+    ).join('');
 
     const modalHtml = `
         <div class="modal-overlay" id="guia-modal-overlay" onclick="cerrarModalGuia()">
             <div class="modal-content" id="guia-modal-content" onclick="event.stopPropagation()" style="max-width: 900px; width: 95%; max-height: 90vh; transition: max-width 0.3s ease;">
                 <div class="modal-header">
-                    <h2 style="margin: 0; color: #1a5f7a; font-size: 24px;">Solicitar Guía de Movilización</h2>
-                    <button class="close-modal" onclick="cerrarModalGuia()">×</button>
+                    <h2 style="margin: 0; color: #1a5f7a; font-size: 24px;">Solicitar Gu├â┬¡a de Movilizaci├â┬│n</h2>
+                    <button class="close-modal" onclick="cerrarModalGuia()">├âÔÇö</button>
                 </div>
                 <div class="modal-body" style="max-height: calc(90vh - 140px); overflow-y: auto; display: flex; gap: 20px;">
                     <!-- LEFT COLUMN: FORM -->
                     <div id="guia-form-container" style="flex: 1; min-width: 0;">
                         <form id="guia-form" onsubmit="event.preventDefault(); previsualizarGuia();">
-                            <!-- DESCRIPCIÓN DEL MATERIAL -->
+                            <!-- DESCRIPCI├âÔÇ£N DEL MATERIAL -->
                         <div style="margin-bottom: 25px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #1a5f7a; padding-bottom: 5px;">
                                 <h4 style="margin: 0; color: #1a5f7a; font-size: 18px;">
-                                    Descripción de Materiales
+                                    Descripci├â┬│n de Materiales
                                 </h4>
                                 <button type="button" class="btn btn-outline btn-sm" onclick="agregarFilaMaterial()">
                                     + Agregar Material
@@ -1758,7 +1801,7 @@ async function mostrarFormularioGuia() {
                             </div>
                             
                             <div id="materiales-container">
-                                <!-- Las filas de materiales se agregarán aquí dinámicamente -->
+                                <!-- Las filas de materiales se agregar├â┬ín aqu├â┬¡ din├â┬ímicamente -->
                             </div>
                             
                             <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
@@ -1779,17 +1822,17 @@ async function mostrarFormularioGuia() {
                             </h4>
                             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px;">
                                 <div class="form-group">
-                                    <label>Razón Social / Nombre *</label>
+                                    <label>Raz├â┬│n Social / Nombre *</label>
                                     <input type="text" name="cliente_nombre" class="form-control" required placeholder="Nombre de la empresa o persona">
                                 </div>
                                 <div class="form-group">
-                                    <label>RIF / Cédula *</label>
+                                    <label>RIF / C├â┬®dula *</label>
                                     <input type="text" name="cliente_rif" class="form-control" required placeholder="Ej: J-12345678-9">
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label>Dirección Fiscal *</label>
-                                <input type="text" name="cliente_direccion" class="form-control" required placeholder="Dirección legal del cliente">
+                                <label>Direcci├â┬│n Fiscal *</label>
+                                <input type="text" name="cliente_direccion" class="form-control" required placeholder="Direcci├â┬│n legal del cliente">
                             </div>
                         </div>
 
@@ -1799,19 +1842,19 @@ async function mostrarFormularioGuia() {
                                 Rutas de Traslado
                             </h4>
                             <div class="form-group">
-                                <label>Dirección de Origen *</label>
-                                <input type="text" name="origen" class="form-control" required placeholder="Dirección completa del origen">
+                                <label>Direcci├â┬│n de Origen *</label>
+                                <input type="text" name="origen" class="form-control" required placeholder="Direcci├â┬│n completa del origen">
                             </div>
                             <div class="form-group">
-                                <label>Dirección de Destino *</label>
-                                <input type="text" name="destino" class="form-control" required placeholder="Dirección completa del destino">
+                                <label>Direcci├â┬│n de Destino *</label>
+                                <input type="text" name="destino" class="form-control" required placeholder="Direcci├â┬│n completa del destino">
                             </div>
                         </div>
 
-                        <!-- DATOS DEL VEHÍCULO -->
+                        <!-- DATOS DEL VEH├â┬ìCULO -->
                         <div style="margin-bottom: 25px;">
                             <h4 style="margin: 20px 0 15px; color: #1a5f7a; border-bottom: 2px solid #1a5f7a; padding-bottom: 5px; font-size: 18px;">
-                                Datos del Vehículo
+                                Datos del Veh├â┬¡culo
                             </h4>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                                 <div class="form-group">
@@ -1831,7 +1874,7 @@ async function mostrarFormularioGuia() {
                                     <input type="text" name="vehiculo_placa" class="form-control" required placeholder="Ej: A1B2C3D" style="text-transform: uppercase;">
                                 </div>
                                 <div class="form-group">
-                                    <label>Tipo de Carrocería *</label>
+                                    <label>Tipo de Carrocer├â┬¡a *</label>
                                     <select name="vehiculo_carroceria" class="form-control" required>
                                         <option value="">Seleccione...</option>
                                         <option value="Volteo">Volteo</option>
@@ -1855,7 +1898,7 @@ async function mostrarFormularioGuia() {
                                     <input type="text" name="conductor_nombre" class="form-control" required placeholder="Nombre completo del conductor">
                                 </div>
                                 <div class="form-group">
-                                    <label>Cédula de Identidad *</label>
+                                    <label>C├â┬®dula de Identidad *</label>
                                     <input type="text" name="conductor_cedula" class="form-control" required placeholder="Ej: V-12345678">
                                 </div>
                             </div>
@@ -1876,7 +1919,7 @@ async function mostrarFormularioGuia() {
                 <!-- RIGHT COLUMN: PREVIEW PANE -->
                 <div id="guia-preview-container" style="flex: 1; display: none; border-left: 1px solid #ccc; padding-left: 20px; flex-direction: column; min-width: 0;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h4 style="margin: 0; color: #1a5f7a; font-size: 18px;">Previsualización</h4>
+                        <h4 style="margin: 0; color: #1a5f7a; font-size: 18px;">Previsualizaci├â┬│n</h4>
                     </div>
                     <div id="preview-loading" style="display: none; text-align: center; padding: 40px; color: #666;">
                         <div class="spinner"></div> Generando vista previa...
@@ -1887,11 +1930,11 @@ async function mostrarFormularioGuia() {
 
             <div class="modal-footer" id="modal-footer-normal">
                 <button type="button" class="btn btn-secondary" onclick="cerrarModalGuia()">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="previsualizarGuia()" style="background: #007aff; padding: 10px 20px;">📄 Previsualizar Guía</button>
+                <button type="button" class="btn btn-primary" onclick="previsualizarGuia()" style="background: #007aff; padding: 10px 20px;">├░┼©ÔÇ£ÔÇ× Previsualizar Gu├â┬¡a</button>
             </div>
             <div class="modal-footer" id="modal-footer-preview" style="display: none;">
-                <button type="button" class="btn btn-secondary" onclick="cancelarPrevisualizacion()">⬅ Volver a Editar</button>
-                <button type="button" class="btn btn-success" onclick="solicitarGuiaDefinitiva()" style="background: #28a745; padding: 10px 20px;">✅ Generar Guía Definitiva</button>
+                <button type="button" class="btn btn-secondary" onclick="cancelarPrevisualizacion()">├ó┬¼ÔÇª Volver a Editar</button>
+                <button type="button" class="btn btn-success" onclick="solicitarGuiaDefinitiva()" style="background: #28a745; padding: 10px 20px;">├ó┼ôÔÇª Generar Gu├â┬¡a Definitiva</button>
             </div>
         </div>
     </div>
@@ -1899,10 +1942,8 @@ async function mostrarFormularioGuia() {
 
     document.getElementById('modal-container').innerHTML = modalHtml;
 
-    // Agregar la primera fila de material automáticamente
-    setTimeout(() => {
-        agregarFilaMaterial();
-    }, 100);
+    // Agregar la primera fila de material autom├â┬íticamente
+    agregarFilaMaterial();
 }
 
 function cerrarModalGuia() {
@@ -1913,13 +1954,13 @@ function cerrarModalGuia() {
     document.getElementById('modal-container').innerHTML = '';
 }
 
-// Guarda temporalmente los datos del formulario si la previsualización es exitosa
+// Guarda temporalmente los datos del formulario si la previsualizaci├â┬│n es exitosa
 let tempGuiaData = null;
 
 async function previsualizarGuia() {
     const form = document.getElementById('guia-form');
     if (!form) {
-        alert('Error: No se encontró el formulario');
+        alert('Error: No se encontr├â┬│ el formulario');
         return;
     }
 
@@ -1997,7 +2038,7 @@ async function previsualizarGuia() {
         iframe.style.display = 'block';
 
     } catch (error) {
-        alert('Error en previsualización: ' + error.message);
+        alert('Error en previsualizaci├â┬│n: ' + error.message);
         cancelarPrevisualizacion();
     }
 }
@@ -2030,15 +2071,15 @@ async function solicitarGuiaDefinitiva() {
 
         if (response.success) {
             if (response.details) {
-                alert(`⚠️ ${response.message}\n\nDetalles del error PDF: ${response.details}\n\n📋 Número de Guía: ${response.guia.numero_guia}\n💰 Tasa BCV: ${response.guia.tasa_bcv} Bs./$\n💵 Monto: Bs. ${formatNumber(response.guia.monto_pagar)}`);
+                alert(`├ó┼í┬á├»┬©┬Å ${response.message}\n\nDetalles del error PDF: ${response.details}\n\n├░┼©ÔÇ£ÔÇ╣ N├â┬║mero de Gu├â┬¡a: ${response.guia.numero_guia}\n├░┼©ÔÇÖ┬░ Tasa BCV: ${response.guia.tasa_bcv} Bs./$\n├░┼©ÔÇÖ┬Á Monto: Bs. ${formatNumber(response.guia.monto_pagar)}`);
             } else {
-                alert(`✅ Guía solicitada exitosamente.\n\n📋 Número de Guía: ${response.guia.numero_guia}\n💰 Tasa BCV Aplicada: ${response.guia.tasa_bcv} Bs./$\n💵 Monto Total a Pagar: Bs. ${formatNumber(response.guia.monto_pagar)}\n🏦 Banco: ${response.guia.banco}\n💳 Cuenta: ${response.guia.cuenta}\n\nPor favor, realice el pago y suba el comprobante.`);
+                alert(`├ó┼ôÔÇª Gu├â┬¡a solicitada exitosamente.\n\n├░┼©ÔÇ£ÔÇ╣ N├â┬║mero de Gu├â┬¡a: ${response.guia.numero_guia}\n├░┼©ÔÇÖ┬░ Tasa BCV Aplicada: ${response.guia.tasa_bcv} Bs./$\n├░┼©ÔÇÖ┬Á Monto Total a Pagar: Bs. ${formatNumber(response.guia.monto_pagar)}\n├░┼©┬Å┬ª Banco: ${response.guia.banco}\n├░┼©ÔÇÖ┬│ Cuenta: ${response.guia.cuenta}\n\nPor favor, realice el pago y suba el comprobante.`);
             }
             cerrarModalGuia();
             loadDashboard();
         }
     } catch (error) {
-        alert('Error al solicitar guía: ' + error.message);
+        alert('Error al solicitar gu├â┬¡a: ' + error.message);
     } finally {
         showLoading(false);
     }
@@ -2050,7 +2091,7 @@ function subirComprobante(guiaId, monto) {
             <div class="modal-content floating-anim" style="max-width: 500px; border-radius: 24px; overflow: hidden; border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 20px 40px rgba(0,0,0,0.2);">
                 <div class="modal-header" style="border: none; padding: 24px 24px 10px;">
                     <h2 style="font-size: 24px; font-weight: 800; color: #1a1a1a;">Subir Comprobante de Pago</h2>
-                    <button class="close-modal" onclick="cerrarModal('pago-modal-overlay')">×</button>
+                    <button class="close-modal" onclick="cerrarModal('pago-modal-overlay')">├âÔÇö</button>
                 </div>
                 <div class="modal-body" style="padding: 0 24px 24px;">
                     <form id="pago-form" enctype="multipart/form-data">
@@ -2072,7 +2113,7 @@ function subirComprobante(guiaId, monto) {
                         </div>
                         
                         <div class="form-group" style="margin-bottom: 16px;">
-                            <label style="font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; display: block;">Número de Referencia *</label>
+                            <label style="font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; display: block;">N├â┬║mero de Referencia *</label>
                             <input type="text" name="numero_referencia" class="form-control" placeholder="Ej: 00123456" required style="background: #f8f9fa; border-radius: 12px;">
                         </div>
                         
@@ -2116,7 +2157,7 @@ async function enviarComprobante() {
         const data = await response.json();
 
         if (data.success) {
-            alert('Comprobante subido exitosamente. Pendiente de verificación.');
+            alert('Comprobante subido exitosamente. Pendiente de verificaci├â┬│n.');
             cerrarModal('pago-modal-overlay');
             loadDashboard();
         } else {
@@ -2130,8 +2171,8 @@ async function enviarComprobante() {
 }
 
 async function descargarGuia(guiaId) {
-    // Si estamos en entorno Capacitor/Móvil, usamos el navegador del sistema para las descargas
-    // Esto evita que el WebView bloquee el Blob o no sepa qué hacer con el archivo
+    // Si estamos en entorno Capacitor/M├â┬│vil, usamos el navegador del sistema para las descargas
+    // Esto evita que el WebView bloquee el Blob o no sepa qu├â┬® hacer con el archivo
     if (window.Capacitor && window.Capacitor.getPlatform() !== 'web') {
         const downloadUrl = `${API_BASE}/guias/${guiaId}/pdf?token=${authToken}`;
         window.open(downloadUrl, '_system');
@@ -2160,13 +2201,13 @@ async function descargarGuia(guiaId) {
             alert('Error: ' + data.error);
         }
     } catch (error) {
-        alert('Error al descargar guía');
+        alert('Error al descargar gu├â┬¡a');
     } finally {
         showLoading(false);
     }
 }
 
-// La función calcularImpuestoEstimado ha sido movida al final del archivo para manejar múltiples materiales.
+// La funci├â┬│n calcularImpuestoEstimado ha sido movida al final del archivo para manejar m├â┬║ltiples materiales.
 
 
 async function rechazarPago(pagoId) {
@@ -2190,7 +2231,7 @@ async function rechazarPago(pagoId) {
 }
 
 async function marcarUsada(guiaId) {
-    if (!confirm('¿Marcar esta guía como usada?')) return;
+    if (!confirm('├é┬┐Marcar esta gu├â┬¡a como usada?')) return;
 
     showLoading(true);
 
@@ -2198,18 +2239,18 @@ async function marcarUsada(guiaId) {
         const response = await apiRequest(`/guias/${guiaId}/marcar-usada`, 'PUT');
 
         if (response.success) {
-            alert('Guía marcada como usada.');
+            alert('Gu├â┬¡a marcada como usada.');
             loadDashboard();
         }
     } catch (error) {
-        alert('Error al marcar guía');
+        alert('Error al marcar gu├â┬¡a');
     } finally {
         showLoading(false);
     }
 }
 
 async function exonerarGuia(id) {
-    if (!confirm('¿Está seguro de que desea exonerar el pago de esta guía? Esta acción marcará la guía como pagada totalmente y no se podrá revertir.')) {
+    if (!confirm('├é┬┐Est├â┬í seguro de que desea exonerar el pago de esta gu├â┬¡a? Esta acci├â┬│n marcar├â┬í la gu├â┬¡a como pagada totalmente y no se podr├â┬í revertir.')) {
         return;
     }
 
@@ -2220,19 +2261,19 @@ async function exonerarGuia(id) {
         if (response.success) {
             Swal.fire({
                 icon: 'success',
-                title: '¡Exonerada!',
-                text: 'La guía ha sido exonerada exitosamente.',
+                title: '├é┬íExonerada!',
+                text: 'La gu├â┬¡a ha sido exonerada exitosamente.',
                 timer: 2000,
                 showConfirmButton: false
             });
             loadDashboard(); // Recargar el dashboard
         }
     } catch (error) {
-        console.error('Error al exonerar guía:', error);
+        console.error('Error al exonerar gu├â┬¡a:', error);
         Swal.fire({
             icon: 'error',
             title: 'Error',
-            text: error.message || 'No se pudo procesar la exoneración.'
+            text: error.message || 'No se pudo procesar la exoneraci├â┬│n.'
         });
     } finally {
         showLoading(false);
@@ -2240,7 +2281,7 @@ async function exonerarGuia(id) {
 }
 
 async function anularGuia(guiaId) {
-    const motivo = prompt('Ingrese el motivo de anulación:');
+    const motivo = prompt('Ingrese el motivo de anulaci├â┬│n:');
     if (!motivo) return;
 
     showLoading(true);
@@ -2249,11 +2290,11 @@ async function anularGuia(guiaId) {
         const response = await apiRequest(`/guias/${guiaId}/anular`, 'PUT', { motivo });
 
         if (response.success) {
-            alert('Guía anulada.');
+            alert('Gu├â┬¡a anulada.');
             loadDashboard();
         }
     } catch (error) {
-        alert('Error al anular guía');
+        alert('Error al anular gu├â┬¡a');
     } finally {
         showLoading(false);
     }
@@ -2261,8 +2302,8 @@ async function anularGuia(guiaId) {
 
 async function eliminarGuia(guiaId, numeroGuia) {
     const { value: clave } = await Swal.fire({
-        title: '🗑️ Eliminar Guía Permanentemente',
-        html: `<p style="margin-bottom:12px;">Esta acción <strong>no se puede deshacer</strong>. Se eliminará la guía <strong>${numeroGuia}</strong> de forma definitiva.</p>
+        title: '├░┼©ÔÇöÔÇÿ├»┬©┬Å Eliminar Gu├â┬¡a Permanentemente',
+        html: `<p style="margin-bottom:12px;">Esta acci├â┬│n <strong>no se puede deshacer</strong>. Se eliminar├â┬í la gu├â┬¡a <strong>${numeroGuia}</strong> de forma definitiva.</p>
                <p>Ingresa la clave de administrador para continuar:</p>`,
         input: 'password',
         inputPlaceholder: 'Clave de administrador',
@@ -2279,19 +2320,19 @@ async function eliminarGuia(guiaId, numeroGuia) {
     try {
         const response = await apiRequest(`/guias/${guiaId}`, 'DELETE', { clave_admin: clave });
         if (response.success) {
-            Swal.fire('✅ Eliminada', `La guía ${numeroGuia} fue eliminada permanentemente.`, 'success');
+            Swal.fire('├ó┼ôÔÇª Eliminada', `La gu├â┬¡a ${numeroGuia} fue eliminada permanentemente.`, 'success');
             loadDashboard();
         } else {
             throw new Error(response.error || 'Error al eliminar');
         }
     } catch (error) {
-        Swal.fire('Error', error.message || 'No se pudo eliminar la guía.', 'error');
+        Swal.fire('Error', error.message || 'No se pudo eliminar la gu├â┬¡a.', 'error');
     } finally {
         showLoading(false);
     }
 }
 
-// ===== GESTIÓN DE USUARIOS (MASTER) =====
+// ===== GESTI├âÔÇ£N DE USUARIOS (MASTER) =====
 function mostrarModalCrearUsuario(event) {
     if (event) event.preventDefault();
 
@@ -2300,16 +2341,16 @@ function mostrarModalCrearUsuario(event) {
             <div class="modal-content floating-anim" style="max-width: 600px; border-radius: 28px; overflow: hidden; border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 24px 50px rgba(0,0,0,0.25);">
                 <div class="modal-header" style="border: none; padding: 28px 28px 10px; display: flex; justify-content: space-between; align-items: center;">
                     <h2 style="font-size: 26px; font-weight: 800; color: #1a1a1a; letter-spacing: -0.5px;">Registrar Nueva Empresa</h2>
-                    <button class="close-modal" onclick="cerrarModal('usuario-modal-overlay')" style="background: #f0f0f0; border-radius: 8px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: none; font-size: 20px; color: #666; cursor: pointer;">×</button>
+                    <button class="close-modal" onclick="cerrarModal('usuario-modal-overlay')" style="background: #f0f0f0; border-radius: 8px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: none; font-size: 20px; color: #666; cursor: pointer;">├âÔÇö</button>
                 </div>
                 
                 <div class="modal-body" style="padding: 0 28px 28px;">
                     <form id="usuario-form">
                         <div class="form-group" style="margin-bottom: 20px;">
-                            <label style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin-bottom: 8px; display: block;">Nombre de Empresa (Razón Social) *</label>
+                            <label style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin-bottom: 8px; display: block;">Nombre de Empresa (Raz├â┬│n Social) *</label>
                             <input type="text" name="razon_social" class="form-control" placeholder="Ej: Cantera El Valle C.A." required 
                                 style="background: #f8f9fa; border: 1px solid #E5E5E7; border-radius: 14px; padding: 12px 16px; font-size: 15px; width: 100%;">
-                            <small style="color: #8E8E93; font-size: 12px; margin-top: 6px; display: block;">Este será el nombre de usuario para iniciar sesión.</small>
+                            <small style="color: #8E8E93; font-size: 12px; margin-top: 6px; display: block;">Este ser├â┬í el nombre de usuario para iniciar sesi├â┬│n.</small>
                         </div>
                         
                         <div class="form-group" style="margin-bottom: 20px;">
@@ -2319,7 +2360,7 @@ function mostrarModalCrearUsuario(event) {
                         </div>
                         
                         <div class="form-group" style="margin-bottom: 10px;">
-                            <label style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin-bottom: 8px; display: block;">Contraseña *</label>
+                            <label style="font-size: 14px; font-weight: 700; color: #1a1a1a; margin-bottom: 8px; display: block;">Contrase├â┬▒a *</label>
                             <input type="password" name="password" class="form-control" required 
                                 style="background: #f8f9fa; border: 1px solid #E5E5E7; border-radius: 14px; padding: 12px 16px; font-size: 15px; width: 100%;">
                         </div>
@@ -2340,7 +2381,7 @@ function mostrarModalCrearUsuario(event) {
     if (container) {
         container.innerHTML = modalHtml;
     } else {
-        console.error('No se encontró el contenedor de modales');
+        console.error('No se encontr├â┬│ el contenedor de modales');
     }
 }
 
@@ -2360,9 +2401,9 @@ async function registrarUsuario() {
         const response = await apiRequest('/auth/register-company', 'POST', data);
 
         if (response.success) {
-            alert('Empresa registrada exitosamente.\n\nUsuario: ' + data.razon_social + '\nContraseña: ' + '*'.repeat(data.password.length));
+            alert('Empresa registrada exitosamente.\n\nUsuario: ' + data.razon_social + '\nContrase├â┬▒a: ' + '*'.repeat(data.password.length));
             cerrarModal('usuario-modal-overlay');
-            loadDashboard(); // Recargar para actualizar estadísticas si las hubiera
+            loadDashboard(); // Recargar para actualizar estad├â┬¡sticas si las hubiera
         }
     } catch (error) {
         alert('Error al registrar empresa: ' + error.message);
@@ -2373,18 +2414,18 @@ async function registrarUsuario() {
 
 async function refreshSystemConfig() {
     try {
-        // Añadir cache-buster para asegurar que siempre traiga el estado real del Kill Switch
+        // A├â┬▒adir cache-buster para asegurar que siempre traiga el estado real del Kill Switch
         const response = await apiRequest(`/sistema/config?_t=${new Date().getTime()}`);
         if (response.success) {
             systemConfig = { ...systemConfig, ...response.config };
-            console.log('⚙️ Configuración cargada:', systemConfig);
+            console.log('├ó┼íÔäó├»┬©┬Å Configuraci├â┬│n cargada:', systemConfig);
         }
     } catch (error) {
-        // Silenciar errores de autenticación durante la carga inicial
+        // Silenciar errores de autenticaci├â┬│n durante la carga inicial
         if (error.message && (error.message.includes('401') || error.message.includes('403') || error.message.includes('Token'))) {
             return;
         }
-        console.error('Error al cargar configuración:', error);
+        console.error('Error al cargar configuraci├â┬│n:', error);
     }
 }
 
@@ -2396,8 +2437,8 @@ async function updateSystemConfig(clave, valor) {
             return true;
         }
     } catch (error) {
-        console.error('Error al actualizar configuración:', error);
-        alert('Error al actualizar configuración: ' + error.message);
+        console.error('Error al actualizar configuraci├â┬│n:', error);
+        alert('Error al actualizar configuraci├â┬│n: ' + error.message);
     }
     return false;
 }
@@ -2448,7 +2489,7 @@ function cerrarModal(modalId) {
         modal.remove();
     }
 
-    // Si se pasa un selector genérico o si queremos limpiar el contenedor
+    // Si se pasa un selector gen├â┬®rico o si queremos limpiar el contenedor
     if (!modal && modalId.startsWith('.')) {
         const modalByClass = document.querySelector(modalId);
         if (modalByClass) modalByClass.remove();
@@ -2475,7 +2516,7 @@ function formatNumber(num) {
 }
 
 /**
- * Formatea el número de guía con el prefijo de la empresa y el símbolo # al inicio
+ * Formatea el n├â┬║mero de gu├â┬¡a con el prefijo de la empresa y el s├â┬¡mbolo # al inicio
  */
 function formatNumeroGuia(numeroGuia, prefix = '') {
     if (!numeroGuia) return '';
@@ -2496,11 +2537,11 @@ function formatDate(dateString) {
     return new Date(dateString).toLocaleDateString('es-VE');
 }
 
-// ===== EMPRESA DESTINATARIA - FORMULARIO DE CONFIRMACIÓN =====
+// ===== EMPRESA DESTINATARIA - FORMULARIO DE CONFIRMACI├âÔÇ£N =====
 async function loadConfirmacionPage() {
     const dashboardContent = document.getElementById('dashboard-content');
 
-    // Ocultar sidebar, header y nav móvil para empresas destinatarias
+    // Ocultar sidebar, header y nav m├â┬│vil para empresas destinatarias
     const sidebar = document.getElementById('sidebar');
     const header = document.querySelector('.top-header');
     const mobileNav = document.querySelector('.mobile-nav');
@@ -2514,7 +2555,7 @@ async function loadConfirmacionPage() {
                 <div style="width: 80px; height: 3px; background: linear-gradient(90deg, #FFCE00 0%, #CE1126 50%, #003DA5 100%); margin: 0 auto 20px;"></div>
                 <h1 style="font-size: 28px; font-weight: 600; color: #1a1a1a; margin-bottom: 8px;">Estado La Guaira</h1>
                 <h2 style="font-size: 20px; font-weight: 400; color: #666; margin-bottom: 20px;">Sistema de Control de Minerales</h2>
-                <p style="color: #888; font-size: 14px;">Confirmación de Llegada de Mineral</p>
+                <p style="color: #888; font-size: 14px;">Confirmaci├â┬│n de Llegada de Mineral</p>
             </div>
 
             <div class="card" style="background: white; border-radius: 16px; padding: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
@@ -2533,10 +2574,10 @@ async function loadConfirmacionPage() {
                     </div>
 
                     <div class="form-group" style="margin-bottom: 20px;">
-                        <label style="display: block; font-weight: 500; margin-bottom: 8px; color: #333;">Código de la Guía</label>
+                        <label style="display: block; font-weight: 500; margin-bottom: 8px; color: #333;">C├â┬│digo de la Gu├â┬¡a</label>
                         <input type="text" id="codigo_guia" name="codigo_guia" required placeholder="Ejemplo: #1254786"
                                style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;">
-                        <small style="color: #888; font-size: 12px;">Ingrese el código que aparece en la guía física (puede incluir o no el símbolo #)</small>
+                        <small style="color: #888; font-size: 12px;">Ingrese el c├â┬│digo que aparece en la gu├â┬¡a f├â┬¡sica (puede incluir o no el s├â┬¡mbolo #)</small>
                     </div>
 
                     <div class="form-group" style="margin-bottom: 20px;">
@@ -2547,7 +2588,7 @@ async function loadConfirmacionPage() {
 
                     <div class="form-group" style="margin-bottom: 25px;">
                         <label style="display: block; font-weight: 500; margin-bottom: 8px; color: #333;">
-                            Foto de la Guía <span style="color: #e53e3e;">*</span>
+                            Foto de la Gu├â┬¡a <span style="color: #e53e3e;">*</span>
                         </label>
                         <div style="border: 2px dashed #ddd; border-radius: 8px; padding: 20px; text-align: center; background: #fafafa;">
                             <input type="file" id="foto_guia" name="foto_guia" accept="image/jpeg,image/png" required
@@ -2561,7 +2602,7 @@ async function loadConfirmacionPage() {
                                         <polyline points="21 15 16 10 5 21"/>
                                     </svg>
                                     <p style="color: #666; font-size: 14px; margin: 0;">Haga clic para seleccionar una foto</p>
-                                    <p style="color: #999; font-size: 12px; margin: 5px 0 0;">JPG o PNG (máx. 10MB)</p>
+                                    <p style="color: #999; font-size: 12px; margin: 5px 0 0;">JPG o PNG (m├â┬íx. 10MB)</p>
                                 </div>
                             </label>
                         </div>
@@ -2570,20 +2611,20 @@ async function loadConfirmacionPage() {
                     <div id="confirmacion-error" class="error-message" style="display: none; margin-bottom: 15px; padding: 12px; background: #fee; border-radius: 8px; color: #c00;"></div>
 
                     <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; padding: 15px; font-size: 16px; font-weight: 600;">
-                        ✓ Confirmar Llegada del Mineral
+                        ├ó┼ôÔÇ£ Confirmar Llegada del Mineral
                     </button>
                 </form>
 
                 <div style="margin-top: 20px; text-align: center;">
                     <button class="btnbtn-outline btn-sm" onclick="handleLogout()" style="color: #666; border: none; background: none; cursor: pointer; font-size: 14px;">
-                        Cerrar Sesión
+                        Cerrar Sesi├â┬│n
                     </button>
                 </div>
             </div>
 
             <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
                 <p>Sistema Oficial del Gobierno del Estado La Guaira</p>
-                <p>© 2026 - Todos los derechos reservados</p>
+                <p>├é┬® 2026 - Todos los derechos reservados</p>
             </div>
         </div>
     `;
@@ -2599,7 +2640,7 @@ function previewImage(input) {
         reader.onload = function (e) {
             preview.innerHTML = `
                 <img src="${e.target.result}" style="max-width: 100%; max-height: 300px; border-radius: 8px;">
-                <p style="color: #28a745; font-size: 14px; margin-top: 10px;">✓ Foto cargada</p>
+                <p style="color: #28a745; font-size: 14px; margin-top: 10px;">├ó┼ôÔÇ£ Foto cargada</p>
             `;
         };
         reader.readAsDataURL(input.files[0]);
@@ -2617,7 +2658,7 @@ async function handleSubmitConfirmacion(e) {
 
     // Validar que se haya seleccionado una foto
     if (!formData.get('foto_guia') || formData.get('foto_guia').size === 0) {
-        errorDiv.textContent = 'Debe adjuntar una foto de la guía.';
+        errorDiv.textContent = 'Debe adjuntar una foto de la gu├â┬¡a.';
         errorDiv.style.display = 'block';
         return;
     }
@@ -2636,14 +2677,14 @@ async function handleSubmitConfirmacion(e) {
         const data = await response.json();
 
         if (data.success) {
-            // Mostrar mensaje de éxito
+            // Mostrar mensaje de ├â┬®xito
             mostrarMensajeExito();
         } else {
-            errorDiv.textContent = data.error || 'Error al enviar confirmación.';
+            errorDiv.textContent = data.error || 'Error al enviar confirmaci├â┬│n.';
             errorDiv.style.display = 'block';
         }
     } catch (error) {
-        errorDiv.textContent = 'Error de conexión. Intente nuevamente.';
+        errorDiv.textContent = 'Error de conexi├â┬│n. Intente nuevamente.';
         errorDiv.style.display = 'block';
     } finally {
         showLoading(false);
@@ -2659,21 +2700,21 @@ function mostrarMensajeExito() {
                     <polyline points="20 6 9 17 4 12"/>
                 </svg>
             </div>
-            <h1 style="font-size: 32px; font-weight: 600; color: #28a745; margin-bottom: 15px;">¡Confirmación Exitosa!</h1>
+            <h1 style="font-size: 32px; font-weight: 600; color: #28a745; margin-bottom: 15px;">├é┬íConfirmaci├â┬│n Exitosa!</h1>
             <p style="font-size: 18px; color: #666; margin-bottom: 30px;">
                 Gracias por confirmar la llegada del mineral
             </p>
             <p style="font-size: 14px; color: #999; margin-bottom: 30px;">
-                Su confirmación ha sido registrada y está siendo procesada por el sistema.
+                Su confirmaci├â┬│n ha sido registrada y est├â┬í siendo procesada por el sistema.
             </p>
             <button class="btn btn-primary" onclick="loadConfirmacionPage()">
-                Registrar Otra Confirmación
+                Registrar Otra Confirmaci├â┬│n
             </button>
         </div>
     `;
 }
 
-// ===== ADMIN - SECCIÓN DE CONFIRMACIONES =====
+// ===== ADMIN - SECCI├âÔÇ£N DE CONFIRMACIONES =====
 async function loadConfirmacionesSection(container) {
     showLoading(true);
 
@@ -2683,8 +2724,8 @@ async function loadConfirmacionesSection(container) {
 
         container.innerHTML = `
             <div class="dashboard-header">
-                <h1 class="dashboard-title">📋 Confirmaciones de Llegada</h1>
-                <p class="dashboard-subtitle">Historial de confirmaciones con fotos de guías</p>
+                <h1 class="dashboard-title">├░┼©ÔÇ£ÔÇ╣ Confirmaciones de Llegada</h1>
+                <p class="dashboard-subtitle">Historial de confirmaciones con fotos de gu├â┬¡as</p>
             </div>
 
             <div class="card">
@@ -2695,7 +2736,7 @@ async function loadConfirmacionesSection(container) {
 
                 ${confirmaciones.length === 0 ? `
                     <div class="card-body text-center" style="padding: 40px;">
-                        <p style="color: #999;">No hay confirmaciones registradas aún.</p>
+                        <p style="color: #999;">No hay confirmaciones registradas a├â┬║n.</p>
                     </div>
                 ` : `
                     <div class="table-wrapper">
@@ -2703,10 +2744,10 @@ async function loadConfirmacionesSection(container) {
                             <thead>
                                 <tr>
                                     <th>Fecha</th>
-                                    <th>Guía</th>
+                                    <th>Gu├â┬¡a</th>
                                     <th>Empresa Destinataria</th>
                                     <th>Mineral</th>
-                                    <th>Validación</th>
+                                    <th>Validaci├â┬│n</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
@@ -2714,17 +2755,17 @@ async function loadConfirmacionesSection(container) {
                                 ${confirmaciones.map(conf => `
                                     <tr>
                                         <td data-label="Fecha">${formatDate(conf.created_at)}<br><small style="color: #888;">${new Date(conf.created_at).toLocaleTimeString()}</small></td>
-                                        <td data-label="Guía">${formatNumeroGuia(conf.numero_guia)}</td>
+                                        <td data-label="Gu├â┬¡a">${formatNumeroGuia(conf.numero_guia)}</td>
                                         <td data-label="Empresa Dest.">${conf.empresa_dest_nombre}<br><small style="color: #888;">${conf.empresa_dest_rif}</small></td>
                                         <td data-label="Mineral">${conf.mineral_recibido}</td>
-                                        <td data-label="Validación">${getValidacionBadge(conf.foto_validada, conf.validacion_confianza)}</td>
+                                        <td data-label="Validaci├â┬│n">${getValidacionBadge(conf.foto_validada, conf.validacion_confianza)}</td>
                                         <td data-label="Acciones">
                                             <div style="display: flex; gap: 5px;">
                                                 <button class="btn btn-primary btn-sm" onclick="verConfirmacion('${conf.id}')">
                                                     Ver Detalles
                                                 </button>
                                                 <button class="btn btn-outline btn-sm" onclick="window.open('${API_BASE}/confirmaciones/${conf.id}/foto', '_blank')" title="Ver Foto Original">
-                                                    📸 Ver Foto
+                                                    ├░┼©ÔÇ£┬© Ver Foto
                                                 </button>
                                             </div>
                                         </td>
@@ -2746,11 +2787,11 @@ async function loadConfirmacionesSection(container) {
 
 function getValidacionBadge(validada, confianza) {
     if (validada && confianza >= 70) {
-        return `<span class="badge badge-success">✅ Validada (${confianza}%)</span>`;
+        return `<span class="badge badge-success">├ó┼ôÔÇª Validada (${confianza}%)</span>`;
     } else if (validada && confianza >= 50) {
-        return `<span class="badge badge-warning">⚠️ Parcial (${confianza}%)</span>`;
+        return `<span class="badge badge-warning">├ó┼í┬á├»┬©┬Å Parcial (${confianza}%)</span>`;
     } else {
-        return `<span class="badge badge-danger">❌ Rechazada (${confianza || 0}%)</span>`;
+        return `<span class="badge badge-danger">├ó┬Ø┼Æ Rechazada (${confianza || 0}%)</span>`;
     }
 }
 
@@ -2766,13 +2807,13 @@ async function verConfirmacion(confirmacionId) {
             <div class="modal-overlay" onclick="cerrarModal('modal-confirmacion')">
                 <div class="modal-dialog" onclick="event.stopPropagation()" style="max-width: 800px;">
                     <div class="modal-header">
-                        <h2 style="margin: 0; font-size: 20px; font-weight: 600;">Detalle de Confirmación #${conf.id.substring(0, 8)}</h2>
+                        <h2 style="margin: 0; font-size: 20px; font-weight: 600;">Detalle de Confirmaci├â┬│n #${conf.id.substring(0, 8)}</h2>
                         <button onclick="cerrarModal('modal-confirmacion')" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999;">&times;</button>
                     </div>
                     <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                             <div>
-                                <h3 style="font-size: 14px; color: #888; margin-bottom: 5px;">Fecha de Confirmación</h3>
+                                <h3 style="font-size: 14px; color: #888; margin-bottom: 5px;">Fecha de Confirmaci├â┬│n</h3>
                                 <p style="font-size: 16px; font-weight: 500;">${formatDate(conf.created_at)} ${new Date(conf.created_at).toLocaleTimeString()}</p>
                             </div>
                             <div>
@@ -2780,7 +2821,7 @@ async function verConfirmacion(confirmacionId) {
                                 <p style="font-size: 16px; font-weight: 500;">${new Date(conf.hora_llegada).toLocaleString()}</p>
                             </div>
                             <div>
-                                <h3 style="font-size: 14px; color: #888; margin-bottom: 5px;">Guía</h3>
+                                <h3 style="font-size: 14px; color: #888; margin-bottom: 5px;">Gu├â┬¡a</h3>
                                 <p style="font-size: 16px; font-weight: 500;">${formatNumeroGuia(conf.numero_guia)}</p>
                             </div>
                             <div>
@@ -2797,20 +2838,20 @@ async function verConfirmacion(confirmacionId) {
                         <hr style="border: none; height: 1px; background: #eee; margin: 20px 0;">
 
                         <div style="margin-bottom: 20px;">
-                            <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 10px;">Validación Automática</h3>
+                            <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 10px;">Validaci├â┬│n Autom├â┬ítica</h3>
                             <div style="background: ${conf.foto_validada ? '#e8f5e9' : '#ffebee'}; padding: 15px; border-radius: 8px;">
                                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                                    ${conf.foto_validada ? '<span style="font-size: 24px;">✅</span>' : '<span style="font-size: 24px;">❌</span>'}
+                                    ${conf.foto_validada ? '<span style="font-size: 24px;">├ó┼ôÔÇª</span>' : '<span style="font-size: 24px;">├ó┬Ø┼Æ</span>'}
                                     <span style="font-size: 18px; font-weight: 600;">Confianza: ${conf.validacion_confianza}%</span>
                                 </div>
                                 <p style="margin: 0; font-size: 14px; color: #666;">
-                                    ${conf.coincidencia_numero_guia ? '✓ Número de guía coincide con el ingresado' : '⚠ No se pudo verificar el número de guía en la foto'}
+                                    ${conf.coincidencia_numero_guia ? '├ó┼ôÔÇ£ N├â┬║mero de gu├â┬¡a coincide con el ingresado' : '├ó┼í┬á No se pudo verificar el n├â┬║mero de gu├â┬¡a en la foto'}
                                 </p>
                             </div>
                         </div>
 
                         <div style="margin-bottom: 20px;">
-                            <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 10px;">Foto de la Guía</h3>
+                            <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 10px;">Foto de la Gu├â┬¡a</h3>
                             <div style="text-align: center; background: #f5f5f5; padding: 20px; border-radius: 8px;">
                                 <img src="${API_BASE}/confirmaciones/${conf.id}/foto" 
                                      style="max-width: 100%; max-height: 400px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"
@@ -2822,7 +2863,7 @@ async function verConfirmacion(confirmacionId) {
                         ${conf.texto_extraido ? `
                             <div style="margin-bottom: 20px;">
                                 <details>
-                                    <summary style="cursor: pointer; font-weight: 600; margin-bottom: 10px;">Texto Extraído (OCR)</summary>
+                                    <summary style="cursor: pointer; font-weight: 600; margin-bottom: 10px;">Texto Extra├â┬¡do (OCR)</summary>
                                     <div style="background: #fafafa; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 200px; overflow-y: auto;">
 ${conf.texto_extraido}
                                     </div>
@@ -2840,7 +2881,7 @@ ${conf.texto_extraido}
         document.getElementById('modal-confirmacion').style.display = 'block';
 
     } catch (error) {
-        alert('Error al cargar confirmación: ' + error.message);
+        alert('Error al cargar confirmaci├â┬│n: ' + error.message);
     } finally {
         showLoading(false);
     }
@@ -2884,12 +2925,12 @@ function toggleSidebar() {
 
 // ===== PERFIL DE EMPRESA =====
 async function loadProfileSection(container) {
-    // Si es Master, mostrar perfil básico sin llamar a la API de empresas
+    // Si es Master, mostrar perfil b├â┬ísico sin llamar a la API de empresas
     if (currentUser.role === 'master') {
         container.innerHTML = `
             <div class="dashboard-header">
-                <h1 class="dashboard-title">👤 Perfil de Administrador</h1>
-                <p class="dashboard-subtitle">Información de la cuenta</p>
+                <h1 class="dashboard-title">├░┼©ÔÇÿ┬ñ Perfil de Administrador</h1>
+                <p class="dashboard-subtitle">Informaci├â┬│n de la cuenta</p>
             </div>
 
             <div class="card">
@@ -2929,7 +2970,7 @@ async function loadProfileSection(container) {
 
         container.innerHTML = `
             <div class="dashboard-header">
-                <h1 class="dashboard-title">👤 Perfil de Empresa</h1>
+                <h1 class="dashboard-title">├░┼©ÔÇÿ┬ñ Perfil de Empresa</h1>
                 <p class="dashboard-subtitle">Gestiona la identidad de tu empresa</p>
             </div>
 
@@ -2953,7 +2994,7 @@ async function loadProfileSection(container) {
 
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
                         <div class="info-group">
-                            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 5px;">Razón Social / Nombre</label>
+                            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 5px;">Raz├â┬│n Social / Nombre</label>
                             <div style="font-size: 16px; padding: 12px; background: #f9f9fa; border-radius: 8px;">${empresa.razon_social}</div>
                         </div>
                         <div class="info-group">
@@ -2961,7 +3002,7 @@ async function loadProfileSection(container) {
                             <div style="font-size: 16px; padding: 12px; background: #f9f9fa; border-radius: 8px;">${empresa.rif}</div>
                         </div>
                         <div class="info-group">
-                            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 5px;">Teléfono</label>
+                            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 5px;">Tel├â┬®fono</label>
                             <div style="font-size: 16px; padding: 12px; background: #f9f9fa; border-radius: 8px;">${empresa.telefono || 'No registrado'}</div>
                         </div>
                         <div class="info-group">
@@ -2969,7 +3010,7 @@ async function loadProfileSection(container) {
                             <div style="font-size: 16px; padding: 12px; background: #f9f9fa; border-radius: 8px;">${empresa.email || 'No registrado'}</div>
                         </div>
                         <div class="info-group" style="grid-column: 1 / -1;">
-                            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 5px;">Dirección Fiscal</label>
+                            <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 5px;">Direcci├â┬│n Fiscal</label>
                             <div style="font-size: 16px; padding: 12px; background: #f9f9fa; border-radius: 8px;">${empresa.direccion || 'No registrada'}</div>
                         </div>
                     </div>
@@ -3004,14 +3045,14 @@ async function subirLogo(input) {
 
             if (data.success) {
                 alert('Logo actualizado correctamente');
-                // Recargar sección para ver cambios
+                // Recargar secci├â┬│n para ver cambios
                 loadProfileSection(document.getElementById('dashboard-content'));
             } else {
                 alert('Error al subir logo: ' + data.error);
             }
         } catch (error) {
             console.error(error);
-            alert('Error de conexión al subir imagen');
+            alert('Error de conexi├â┬│n al subir imagen');
         } finally {
             showLoading(false);
         }
@@ -3019,7 +3060,7 @@ async function subirLogo(input) {
 }
 
 async function verificarPago(pagoId) {
-    if (!confirm('¿Está seguro de que desea verificar este pago? Esta acción activará la guía de movilización.')) return;
+    if (!confirm('├é┬┐Est├â┬í seguro de que desea verificar este pago? Esta acci├â┬│n activar├â┬í la gu├â┬¡a de movilizaci├â┬│n.')) return;
 
     showLoading(true);
 
@@ -3027,7 +3068,7 @@ async function verificarPago(pagoId) {
         const response = await apiRequest(`/pagos/${pagoId}/verificar`, 'PUT');
 
         if (response.success) {
-            alert('Pago verificado exitosamente. La guía ha sido activada.');
+            alert('Pago verificado exitosamente. La gu├â┬¡a ha sido activada.');
             loadPagosSection(document.getElementById('dashboard-content'));
         } else {
             alert('Error: ' + response.error);
@@ -3061,7 +3102,7 @@ async function rechazarPago(pagoId) {
     }
 }
 
-// ===== FUNCIONES DE MATERIALES (DINÁMICO) =====
+// ===== FUNCIONES DE MATERIALES (DIN├â┬üMICO) =====
 
 function agregarFilaMaterial() {
     const container = document.getElementById('materiales-container');
@@ -3069,11 +3110,9 @@ function agregarFilaMaterial() {
 
     const rowId = 'material-row-' + Date.now();
 
-    const mineralesActivos = window.DYNAMIC_MINERALS ? window.DYNAMIC_MINERALS.filter(m => m.activo) : [];
-    
-    const materialesOptions = mineralesActivos.length > 0 
-        ? mineralesActivos.map(m => `<option value="${m.nombre}">${m.nombre}</option>`).join('')
-        : '<option value="">Sin minerales disponibles</option>';
+    const materialesOptions = MATERIALES_DISPONIBLES.map(m =>
+        `<option value="${m}">${m}</option>`
+    ).join('');
 
     const row = document.createElement('div');
     row.id = rowId;
@@ -3104,7 +3143,7 @@ function agregarFilaMaterial() {
             <label style="font-size: 12px; margin-bottom: 4px;">Unidad</label>
             <select name="material_unidad[]" class="form-control" required onchange="calcularImpuestoEstimado()">
                 <option value="toneladas">Ton</option>
-                <option value="m³">m³</option>
+                <option value="m├é┬│">m├é┬│</option>
                 <option value="kg">kg</option>
             </select>
         </div>
@@ -3128,7 +3167,7 @@ function eliminarFilaMaterial(rowId) {
             row.remove();
             calcularImpuestoEstimado();
         } else {
-            alert('Debe incluir al menos un material en la guía.');
+            alert('Debe incluir al menos un material en la gu├â┬¡a.');
         }
     }
 }
@@ -3146,17 +3185,17 @@ function calcularImpuestoEstimado() {
         totalVentaUSD += cant * prec;
     }
 
-    const totalImpuestoUSD = totalVentaUSD * 0.025; // 2.5% Costo de la Guía
+    const totalImpuestoUSD = totalVentaUSD * 0.025; // 2.5% Costo de la Gu├â┬¡a
     const totalImpuestoBS = totalImpuestoUSD * tasaBCV;
 
     totalDisplay.innerHTML = `
         <div style="text-align: right; padding: 10px; background: rgba(26, 95, 122, 0.05); border-radius: 8px;">
             <div style="font-size: 13px; color: #666;">Valor Carga: $${formatNumber(totalVentaUSD)} | Tasa: ${tasaBCV}</div>
-            <div style="font-size: 14px; color: #1a5f7a; font-weight: 600;">Costo Guía (2.5%): $${formatNumber(totalImpuestoUSD)} USD</div>
+            <div style="font-size: 14px; color: #1a5f7a; font-weight: 600;">Costo Gu├â┬¡a (2.5%): $${formatNumber(totalImpuestoUSD)} USD</div>
             <div style="font-size: 20px; color: #28a745; font-weight: 800; margin-top: 4px;">
                 TOTAL A PAGAR: Bs. ${formatNumber(totalImpuestoBS)}
             </div>
-            <small style="color: #666; display: block; margin-top: 4px;">* Este es el monto que la empresa debe transferir por el servicio de guía.</small>
+            <small style="color: #666; display: block; margin-top: 4px;">* Este es el monto que la empresa debe transferir por el servicio de gu├â┬¡a.</small>
         </div>
     `;
 }
@@ -3169,11 +3208,11 @@ async function actualizarTasaManual() {
 
     const nuevaTasa = parseFloat(tasaInput.value);
     if (isNaN(nuevaTasa) || nuevaTasa <= 0) {
-        alert('Por favor ingrese una tasa válida');
+        alert('Por favor ingrese una tasa v├â┬ílida');
         return;
     }
 
-    if (!confirm(`¿Está seguro de cambiar la tasa oficial a ${nuevaTasa} Bs?`)) return;
+    if (!confirm(`├é┬┐Est├â┬í seguro de cambiar la tasa oficial a ${nuevaTasa} Bs?`)) return;
 
     showLoading(true);
     try {
@@ -3184,7 +3223,7 @@ async function actualizarTasaManual() {
             // Actualizar todos los elementos que muestren la tasa si existen
             const tasaEl = document.getElementById('current-tasa-display');
             if (tasaEl) tasaEl.innerText = tasaBCV.toFixed(2);
-            loadDashboard(); // Recargar para actualizar cálculos
+            loadDashboard(); // Recargar para actualizar c├â┬ílculos
         }
     } catch (error) {
         alert('Error al actualizar tasa: ' + error.message);
@@ -3215,7 +3254,7 @@ async function refreshTasaBCV() {
 window.mostrarDetalleIngresos = function () {
     const stats = window.lastDashboardStats;
     if (!stats) {
-        console.error('No hay estadísticas cargadas para mostrar el detalle.');
+        console.error('No hay estad├â┬¡sticas cargadas para mostrar el detalle.');
         return;
     }
 
@@ -3228,8 +3267,8 @@ window.mostrarDetalleIngresos = function () {
         <div class="modal-overlay active" id="income-detail-modal">
             <div class="modal-content floating-anim" style="max-width: 600px; border-radius: 20px;">
                 <div class="modal-header">
-                    <h2 class="card-title" style="margin:0; font-size: 20px; font-weight: 800;">📊 Histórico de Ingresos</h2>
-                    <button class="close-modal" onclick="cerrarModal('income-detail-modal')">×</button>
+                    <h2 class="card-title" style="margin:0; font-size: 20px; font-weight: 800;">├░┼©ÔÇ£┼á Hist├â┬│rico de Ingresos</h2>
+                    <button class="close-modal" onclick="cerrarModal('income-detail-modal')">├âÔÇö</button>
                 </div>
                 <div class="modal-body" style="padding: 20px;">
                     <div class="stats-grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; display: grid;">
@@ -3238,7 +3277,7 @@ window.mostrarDetalleIngresos = function () {
                             <div class="stat-value" style="font-size: 20px; font-weight: 800; color: #1a7a33;">Bs. ${formatNumber(stats.ingresos_mes)}</div>
                         </div>
                         <div class="stat-card stat-primary" style="padding: 15px; background: rgba(0, 122, 255, 0.1); border: 1px solid rgba(0, 122, 255, 0.2); border-radius: 12px;">
-                            <div class="stat-title" style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #0056b3;">TOTAL HISTÓRICO</div>
+                            <div class="stat-title" style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #0056b3;">TOTAL HIST├âÔÇ£RICO</div>
                             <div class="stat-value" style="font-size: 20px; font-weight: 800; color: #0056b3;">Bs. ${formatNumber(stats.ingresos_totales)}</div>
                         </div>
                     </div>
@@ -3248,7 +3287,7 @@ window.mostrarDetalleIngresos = function () {
                         <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
                             <thead style="position: sticky; top: 0; background: #f5f5f7; z-index: 1;">
                                 <tr>
-                                    <th style="padding: 12px; text-align: left; border-bottom: 1px solid #eee; color: #86868b;">Mes / Año</th>
+                                    <th style="padding: 12px; text-align: left; border-bottom: 1px solid #eee; color: #86868b;">Mes / A├â┬▒o</th>
                                     <th style="padding: 12px; text-align: right; border-bottom: 1px solid #eee; color: #86868b;">Monto Recaudado</th>
                                 </tr>
                             </thead>
@@ -3264,7 +3303,7 @@ window.mostrarDetalleIngresos = function () {
                                             </td>
                                         </tr>
                                     `).join('') :
-            '<tr><td colspan="2" style="padding: 30px; text-align: center; color: #86868b;">No hay pagos verificados registrados aún.</td></tr>'
+            '<tr><td colspan="2" style="padding: 30px; text-align: center; color: #86868b;">No hay pagos verificados registrados a├â┬║n.</td></tr>'
         }
                             </tbody>
                         </table>
@@ -3305,7 +3344,7 @@ async function loadNotificationsContent() {
 
     list.innerHTML = '<div class="empty-notifications"><div class="loader" style="width:24px;height:24px;border-width:2px;margin:0 auto;"></div></div>';
 
-    // Simular pequeña carga para UX
+    // Simular peque├â┬▒a carga para UX
     await new Promise(r => setTimeout(r, 400));
 
     let notifications = [];
@@ -3317,30 +3356,30 @@ async function loadNotificationsContent() {
             if (res.pagos && res.pagos.length > 0) {
                 notifications = res.pagos.map(p => ({
                     title: 'Pago por Verificar',
-                    desc: `${p.empresa_nombre} reportó pago de Bs. ${formatNumber(p.monto)}`,
+                    desc: `${p.empresa_nombre} report├â┬│ pago de Bs. ${formatNumber(p.monto)}`,
                     time: p.created_at,
                     type: 'warning',
-                    icon: '💰'
+                    icon: '├░┼©ÔÇÖ┬░'
                 }));
             }
         } else {
-            // Para Empresas: Mostrar estado reciente de guías (Mock por ahora o basado en datos locales)
-            // Intentamos buscar guías recientes usads/anuladas
+            // Para Empresas: Mostrar estado reciente de gu├â┬¡as (Mock por ahora o basado en datos locales)
+            // Intentamos buscar gu├â┬¡as recientes usads/anuladas
             try {
                 const res = await apiRequest('/guias?limit=5');
                 if (res.guias) {
                     notifications = res.guias.slice(0, 5).map(g => {
                         let type = 'info';
-                        let msg = `Guía #${g.numero_guia} creada`;
-                        let icon = '📄';
+                        let msg = `Gu├â┬¡a #${g.numero_guia} creada`;
+                        let icon = '├░┼©ÔÇ£ÔÇ×';
 
-                        if (g.estado === 'activa') { type = 'success'; msg = `Guía #${g.numero_guia} APROBADA y Activa`; icon = '✅'; }
-                        if (g.estado === 'usada') { type = 'info'; msg = `Guía #${g.numero_guia} completada`; icon = '🚚'; }
-                        if (g.estado === 'anulada') { type = 'danger'; msg = `Guía #${g.numero_guia} ANULADA`; icon = '❌'; }
-                        if (g.estado === 'pendiente_pago') { type = 'warning'; msg = `Guía #${g.numero_guia} pendiente de pago`; icon = '⏳'; }
+                        if (g.estado === 'activa') { type = 'success'; msg = `Gu├â┬¡a #${g.numero_guia} APROBADA y Activa`; icon = '├ó┼ôÔÇª'; }
+                        if (g.estado === 'usada') { type = 'info'; msg = `Gu├â┬¡a #${g.numero_guia} completada`; icon = '├░┼©┼í┼í'; }
+                        if (g.estado === 'anulada') { type = 'danger'; msg = `Gu├â┬¡a #${g.numero_guia} ANULADA`; icon = '├ó┬Ø┼Æ'; }
+                        if (g.estado === 'pendiente_pago') { type = 'warning'; msg = `Gu├â┬¡a #${g.numero_guia} pendiente de pago`; icon = '├ó┬Å┬│'; }
 
                         return {
-                            title: 'Actualización de Guía',
+                            title: 'Actualizaci├â┬│n de Gu├â┬¡a',
                             desc: msg,
                             time: g.updated_at || g.created_at,
                             type: type,
@@ -3357,7 +3396,7 @@ async function loadNotificationsContent() {
     if (notifications.length === 0) {
         list.innerHTML = `
             <div class="empty-notifications">
-                <div style="font-size: 24px; margin-bottom: 10px;">📭</div>
+                <div style="font-size: 24px; margin-bottom: 10px;">├░┼©ÔÇ£┬¡</div>
                 No tienes notificaciones nuevas
             </div>`;
         return;
@@ -3411,10 +3450,10 @@ async function startScanner() {
             onScanSuccess
         );
     } catch (err) {
-        console.error("Error al iniciar escáner:", err);
+        console.error("Error al iniciar esc├â┬íner:", err);
         Swal.fire({
-            title: 'Error de Cámara',
-            text: 'No se pudo acceder a la cámara. Por favor, asegúrese de dar los permisos necesarios en su dispositivo.',
+            title: 'Error de C├â┬ímara',
+            text: 'No se pudo acceder a la c├â┬ímara. Por favor, aseg├â┬║rese de dar los permisos necesarios en su dispositivo.',
             icon: 'error',
             confirmButtonColor: '#1a5f7a'
         });
@@ -3435,10 +3474,10 @@ function onScanSuccess(decodedText) {
         if (guiaId && guiaId.length > 20) {
             verificarGuiaPublica(guiaId, hash);
         } else {
-            Swal.fire('Código Inválido', 'El QR no corresponde a una guía del sistema.', 'error');
+            Swal.fire('C├â┬│digo Inv├â┬ílido', 'El QR no corresponde a una gu├â┬¡a del sistema.', 'error');
         }
     } catch (e) {
-        Swal.fire('Error', 'El código escaneado no es una URL de verificación válida.', 'error');
+        Swal.fire('Error', 'El c├â┬│digo escaneado no es una URL de verificaci├â┬│n v├â┬ílida.', 'error');
     }
 }
 
@@ -3447,7 +3486,7 @@ async function stopScanner() {
         try {
             await html5QrCode.stop();
         } catch (e) {
-            console.error("Error al detener el escáner:", e);
+            console.error("Error al detener el esc├â┬íner:", e);
         }
         html5QrCode = null;
     }
@@ -3471,21 +3510,21 @@ async function verificarGuiaPublica(guiaId, hash) {
             const statusBg = data.autentica ? 'rgba(40, 167, 69, 0.1)' : 'rgba(220, 53, 69, 0.1)';
 
             Swal.fire({
-                title: 'Verificación de Guía',
+                title: 'Verificaci├â┬│n de Gu├â┬¡a',
                 html: `
                     <div style="text-align: left; font-size: 14px; font-family: 'Inter', system-ui, -apple-system, sans-serif;">
                         <div style="text-align: center; margin-bottom: 20px; padding: 15px; border-radius: 12px; background: ${statusBg}; border: 2.5px solid ${statusColor}; color: ${statusColor}; font-weight: 800; font-size: 16px; letter-spacing: 0.5px;">
-                            ${data.autentica ? '✅ GUÍA AUTÉNTICA' : '⚠️ FIRMA DIGITAL NO VÁLIDA'}
-                            ${!data.autentica ? '<br><small style="font-weight: 400; font-size: 11px;">Este documento podría ser una falsificación o el código es inválido.</small>' : ''}
+                            ${data.autentica ? '├ó┼ôÔÇª GU├â┬ìA AUT├âÔÇ░NTICA' : '├ó┼í┬á├»┬©┬Å FIRMA DIGITAL NO V├â┬üLIDA'}
+                            ${!data.autentica ? '<br><small style="font-weight: 400; font-size: 11px;">Este documento podr├â┬¡a ser una falsificaci├â┬│n o el c├â┬│digo es inv├â┬ílido.</small>' : ''}
                         </div>
-                        <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>N° Guía:</strong> ${g.numero_guia}</p>
+                        <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>N├é┬░ Gu├â┬¡a:</strong> ${g.numero_guia}</p>
                         <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Estado:</strong> <span style="background: ${g.estado === 'activa' ? '#e6f4ea' : '#fce8e6'}; color: ${g.estado === 'activa' ? '#1e8e3e' : '#d93025'}; padding: 2px 8px; border-radius: 20px; font-weight: 800; font-size: 11px;">${g.estado.toUpperCase()}</span></p>
                         <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Empresa:</strong> ${g.empresa_nombre}</p>
-                        <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Cliente:</strong> ${g.cliente_nombre || 'N/A'}<br><small style="color: #666; font-weight: 400;">📄 RIF/C.I: ${g.cliente_rif || 'N/A'}</small></p>
+                        <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Cliente:</strong> ${g.cliente_nombre || 'N/A'}<br><small style="color: #666; font-weight: 400;">├░┼©ÔÇ£ÔÇ× RIF/C.I: ${g.cliente_rif || 'N/A'}</small></p>
                         <p style="margin-bottom: 12px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Placa:</strong> <span style="font-family: monospace; font-size: 15px; background: #eee; padding: 1px 6px; border-radius: 4px;">${g.vehiculo_placa}</span></p>
                         
                         <div style="margin-top: 15px; padding: 15px; background: #fdfdfd; border-radius: 16px; border: 1px solid #eee; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
-                            <h4 style="margin: 0 0 12px; font-size: 13px; color: #1a5f7a; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #1a5f7a; padding-bottom: 6px; display: inline-block;">📦 Minerales Transportados</h4>
+                            <h4 style="margin: 0 0 12px; font-size: 13px; color: #1a5f7a; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #1a5f7a; padding-bottom: 6px; display: inline-block;">├░┼©ÔÇ£┬ª Minerales Transportados</h4>
                             <div style="display: flex; flex-direction: column; gap: 8px;">
                                 ${g.materiales && g.materiales.length > 0 ? 
                                     g.materiales.map(m => `
@@ -3494,7 +3533,7 @@ async function verificarGuiaPublica(guiaId, hash) {
                                             <span style="background: #e8f0fe; color: #1a73e8; padding: 3px 10px; border-radius: 30px; font-size: 11px; font-weight: 800;">${m.cantidad} ${m.unidad || 'Ton'}</span>
                                         </div>
                                     `).join('') :
-                                    `<div style="color: #666; font-style: italic;">No hay información detallada de materiales</div>`
+                                    `<div style="color: #666; font-style: italic;">No hay informaci├â┬│n detallada de materiales</div>`
                                 }
                             </div>
                         </div>
@@ -3505,11 +3544,11 @@ async function verificarGuiaPublica(guiaId, hash) {
                 confirmButtonColor: '#1a5f7a'
             });
         } else {
-            Swal.fire('No Registrada', 'Esta guía no existe en el sistema oficial de la Gobernación.', 'error');
+            Swal.fire('No Registrada', 'Esta gu├â┬¡a no existe en el sistema oficial de la Gobernaci├â┬│n.', 'error');
         }
     } catch (error) {
         console.error('Error verificando:', error);
-        Swal.fire('Error', 'No se pudo conectar con el servidor de verificación.', 'error');
+        Swal.fire('Error', 'No se pudo conectar con el servidor de verificaci├â┬│n.', 'error');
     } finally {
         showLoadingScreen(false);
     }
@@ -3526,15 +3565,15 @@ function showLoadingScreen(show, text = 'Cargando...') {
     else loader.classList.remove('active');
 }
 
-// ===== ADMINISTRACIÓN DE USUARIOS (CREAR Y GESTIONAR) =====
+// ===== ADMINISTRACI├âÔÇ£N DE USUARIOS (CREAR Y GESTIONAR) =====
 function renderUsuarios(container) {
     container.innerHTML = `
         <div class="content-header">
-            <h2 class="content-title">Gestión de Usuarios</h2>
+            <h2 class="content-title">Gesti├â┬│n de Usuarios</h2>
         </div>
         
         <div class="stats-grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 2rem;">
-            <!-- Formulario de Creación -->
+            <!-- Formulario de Creaci├â┬│n -->
             <div class="stat-card">
                 <h3 id="form-user-title">Crear Nuevo Acceso</h3>
                 <p style="color: #666; margin-bottom: 20px; font-size: 14px;">Seleccione el rol y complete los datos requeridos.</p>
@@ -3550,14 +3589,14 @@ function renderUsuarios(container) {
                     </div>
 
                     <div class="form-group">
-                        <label id="label-username">Nombre de Usuario / Razón Social *</label>
+                        <label id="label-username">Nombre de Usuario / Raz├â┬│n Social *</label>
                         <input type="text" id="nuevo-usuario-username" class="form-control" required placeholder="Ej: Agregados La Guaira C.A. o Nombre del Fiscal">
                     </div>
                     
                     <div id="group-letra" class="form-group">
-                        <label class="form-label">Letra de Código (Prefijo)</label>
+                        <label class="form-label">Letra de C├â┬│digo (Prefijo)</label>
                         <input type="text" id="nuevo-usuario-letra" class="form-control" placeholder="Ej: N (Para N01)" maxlength="5">
-                        <small style="color: #888;">Esta letra aparecerá antes del número de guía.</small>
+                        <small style="color: #888;">Esta letra aparecer├â┬í antes del n├â┬║mero de gu├â┬¡a.</small>
                     </div>
 
                     <div id="group-empresa-padre" class="form-group" style="display: none;">
@@ -3565,7 +3604,7 @@ function renderUsuarios(container) {
                         <select id="nuevo-usuario-empresa-padre" class="form-control">
                             <option value="">Seleccione una empresa...</option>
                         </select>
-                        <small style="color: #666;">El aliado compartirá guías, codificación y pagos con esta empresa.</small>
+                        <small style="color: #666;">El aliado compartir├â┬í gu├â┬¡as, codificaci├â┬│n y pagos con esta empresa.</small>
                     </div>
 
                     <div id="group-rif" class="form-group">
@@ -3574,7 +3613,7 @@ function renderUsuarios(container) {
                     </div>
                     
                     <div class="form-group">
-                        <label>Contraseña Provisional *</label>
+                        <label>Contrase├â┬▒a Provisional *</label>
                         <input type="password" id="nuevo-usuario-password" class="form-control" required placeholder="Min. 6 caracteres">
                     </div>
                     
@@ -3590,9 +3629,9 @@ function renderUsuarios(container) {
                 </form>
             </div>
 
-            <!-- Resumen Rápido -->
+            <!-- Resumen R├â┬ípido -->
             <div class="stat-card" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; background: linear-gradient(135deg, #1a5f7a 0%, #0d2b38 100%); color: white;">
-                <div style="font-size: 40px; margin-bottom: 10px;">👥</div>
+                <div style="font-size: 40px; margin-bottom: 10px;">├░┼©ÔÇÿ┬Ñ</div>
                 <h3 style="color: white; margin-bottom: 5px;">Control de Usuarios</h3>
                 <p style="opacity: 0.8; font-size: 13px;">Como administrador Master, puedes habilitar o deshabilitar accesos en tiempo real para mantener la seguridad del sistema.</p>
             </div>
@@ -3645,7 +3684,7 @@ function ajustarCamposRegistro(role) {
         groupPadre.style.display = 'none';
         inputRif.required = true;
         selectPadre.required = false;
-        labelUsername.innerText = 'Razón Social de la Empresa *';
+        labelUsername.innerText = 'Raz├â┬│n Social de la Empresa *';
     }
 }
 
@@ -3666,7 +3705,7 @@ async function renderListaUsuarios() {
             return;
         }
 
-        // Población del dropdown de Empresa Vinculada (Aliados)
+        // Poblaci├â┬│n del dropdown de Empresa Vinculada (Aliados)
         const selectPadre = document.getElementById('nuevo-usuario-empresa-padre');
         if (selectPadre) {
             const empresasUnicas = Array.from(new Map(data.users.filter(u => u.role === 'empresa' && u.empresa_id).map(u => [u.empresa_id, u])).values());
@@ -3681,12 +3720,12 @@ async function renderListaUsuarios() {
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Usuario / Razón Social</th>
+                        <th>Usuario / Raz├â┬│n Social</th>
                         <th>Prefix</th>
                         <th>Rol</th>
-                        <th>Identificación (RIF)</th>
+                        <th>Identificaci├â┬│n (RIF)</th>
                         <th>Estado</th>
-                        <th>Acción</th>
+                        <th>Acci├â┬│n</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -3705,24 +3744,24 @@ async function renderListaUsuarios() {
                                 <div style="display: flex; gap: 5px;">
                                     ${u.role === 'empresa' && u.empresa_id ? `
                                         <button class="btn btn-primary btn-sm" onclick="editarEmpresa('${u.empresa_id}', '${u.empresa_nombre || u.username}', '${u.codigo_letra || ''}')" title="Editar Empresa">
-                                            ✏️
+                                            ├ó┼ô┬Å├»┬©┬Å
                                         </button>
                                     ` : ''}
                                     ${u.role === 'contribuyente' && u.empresa_id ? `
                                         <button class="btn btn-info btn-sm" onclick="vincularAliado('${u.id}', '${u.empresa_id}')" title="Vincular a Empresa">
-                                            🔗
+                                            ├░┼©ÔÇØÔÇö
                                         </button>
                                     ` : ''}
                                     ${u.role !== 'master' ? `
-                                        <button class="btn btn-secondary btn-sm" onclick="cambiarClaveUsuario('${u.id}', '${u.username}')" title="Cambiar Contraseña">
-                                            🔑
+                                        <button class="btn btn-secondary btn-sm" onclick="cambiarClaveUsuario('${u.id}', '${u.username}')" title="Cambiar Contrase├â┬▒a">
+                                            ├░┼©ÔÇØÔÇÿ
                                         </button>
                                     ` : ''}
                                     <button class="btn ${u.activo ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleUserStatus('${u.id}', ${u.activo})">
                                         ${u.activo ? 'Desactivar' : 'Activar'}
                                     </button>
                                     <button class="btn btn-danger btn-sm" onclick="eliminarUsuario('${u.id}')" title="Borrar Registros del Usuario" style="background-color: #dc3545; border-color: #dc3545;">
-                                        🗑️
+                                        ├░┼©ÔÇöÔÇÿ├»┬©┬Å
                                     </button>
                                 </div>
                             </td>
@@ -3742,14 +3781,14 @@ async function cambiarClaveUsuario(userId, username) {
     const { value: nuevaContrasena } = await Swal.fire({
         title: `Cambiar Clave de ${username}`,
         input: 'password',
-        inputLabel: 'Nueva Contraseña',
-        inputPlaceholder: 'Ingresa la nueva contraseña',
+        inputLabel: 'Nueva Contrase├â┬▒a',
+        inputPlaceholder: 'Ingresa la nueva contrase├â┬▒a',
         showCancelButton: true,
         confirmButtonText: 'Guardar Clave',
         cancelButtonText: 'Cancelar',
         inputValidator: (value) => {
             if (!value || value.length < 6) {
-                return 'La contraseña debe tener al menos 6 caracteres';
+                return 'La contrase├â┬▒a debe tener al menos 6 caracteres';
             }
         }
     });
@@ -3760,14 +3799,14 @@ async function cambiarClaveUsuario(userId, username) {
             if (response.success) {
                 Swal.fire({
                     icon: 'success',
-                    title: '¡Contraseña Actualizada!',
-                    text: `La contraseña de ${username} ha sido cambiada correctamente.`,
+                    title: '├é┬íContrase├â┬▒a Actualizada!',
+                    text: `La contrase├â┬▒a de ${username} ha sido cambiada correctamente.`,
                     timer: 2000,
                     showConfirmButton: false
                 });
             }
         } catch (error) {
-            Swal.fire('Error', 'No se pudo cambiar la contraseña: ' + error.message, 'error');
+            Swal.fire('Error', 'No se pudo cambiar la contrase├â┬▒a: ' + error.message, 'error');
         }
     }
 }
@@ -3775,13 +3814,13 @@ async function cambiarClaveUsuario(userId, username) {
 async function toggleUserStatus(userId, currentStatus) {
     const newStatus = !currentStatus;
     const confirm = await Swal.fire({
-        title: '¿Estás seguro?',
-        text: `El usuario será ${newStatus ? 'activado' : 'desactivado'} y ${newStatus ? 'podrá' : 'NO podrá'} entrar al sistema.`,
+        title: '├é┬┐Est├â┬ís seguro?',
+        text: `El usuario ser├â┬í ${newStatus ? 'activado' : 'desactivado'} y ${newStatus ? 'podr├â┬í' : 'NO podr├â┬í'} entrar al sistema.`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#1a5f7a',
         cancelButtonColor: '#d33',
-        confirmButtonText: 'Sí, cambiar estado'
+        confirmButtonText: 'S├â┬¡, cambiar estado'
     });
 
     if (confirm.isConfirmed) {
@@ -3810,13 +3849,13 @@ async function toggleUserStatus(userId, currentStatus) {
 
 async function eliminarUsuario(userId) {
     const confirm = await Swal.fire({
-        title: '⚠️ ¿Eliminar Usuario?',
-        text: "La eliminación será permanente. Si el usuario ya facturó / creó guías, el sistema denegará la eliminación para no dañar los registros históricos.",
+        title: '├ó┼í┬á├»┬©┬Å ├é┬┐Eliminar Usuario?',
+        text: "La eliminaci├â┬│n ser├â┬í permanente. Si el usuario ya factur├â┬│ / cre├â┬│ gu├â┬¡as, el sistema denegar├â┬í la eliminaci├â┬│n para no da├â┬▒ar los registros hist├â┬│ricos.",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
         cancelButtonColor: '#aaa',
-        confirmButtonText: 'Sí, Eliminar de la lista'
+        confirmButtonText: 'S├â┬¡, Eliminar de la lista'
     });
 
     if (confirm.isConfirmed) {
@@ -3837,7 +3876,7 @@ async function eliminarUsuario(userId) {
             renderListaUsuarios();
         } catch (error) {
             console.error('Error eliminando usuario:', error);
-            Swal.fire('Acción Reprobada', error.message, 'error');
+            Swal.fire('Acci├â┬│n Reprobada', error.message, 'error');
         } finally {
             showLoading(false);
         }
@@ -3857,7 +3896,7 @@ async function crearUsuario(event) {
         const selectPadre = document.getElementById('nuevo-usuario-empresa-padre');
         const selectedOption = selectPadre.options[selectPadre.selectedIndex];
         rif = selectedOption ? selectedOption.getAttribute('data-rif') : '';
-        letra = ''; // El backend/db usa la codificación de la empresa padre
+        letra = ''; // El backend/db usa la codificaci├â┬│n de la empresa padre
         
         if (!rif) {
             return Swal.fire('Error', 'Debe seleccionar una Empresa Vinculada para este Aliado.', 'error');
@@ -3865,7 +3904,7 @@ async function crearUsuario(event) {
     }
 
     if (password.length < 6) {
-        return Swal.fire('Error', 'La contraseña debe tener al menos 6 caracteres.', 'error');
+        return Swal.fire('Error', 'La contrase├â┬▒a debe tener al menos 6 caracteres.', 'error');
     }
     
     const btnSubmit = event.target.querySelector('button[type="submit"]');
@@ -3893,7 +3932,7 @@ async function crearUsuario(event) {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Error al crear usuario');
         
-        Swal.fire('Éxito', data.message, 'success');
+        Swal.fire('├âÔÇ░xito', data.message, 'success');
         event.target.reset();
         renderListaUsuarios();
         
@@ -3908,19 +3947,19 @@ async function crearUsuario(event) {
 
 async function editarEmpresa(empresaId, nombreActual, letraActual) {
     const { value: formValues } = await Swal.fire({
-        title: '✏️ Editar Empresa',
+        title: '├ó┼ô┬Å├»┬©┬Å Editar Empresa',
         html: `
             <div style="text-align: left;">
-                <label style="display: block; font-weight: 600; margin-bottom: 5px;">Razón Social</label>
+                <label style="display: block; font-weight: 600; margin-bottom: 5px;">Raz├â┬│n Social</label>
                 <input id="edit-nombre" class="swal2-input" value="${nombreActual}" style="margin: 0 0 15px 0; width: 100%;">
                 
-                <label style="display: block; font-weight: 600; margin-bottom: 5px;">Letra de Código (Prefijo)</label>
+                <label style="display: block; font-weight: 600; margin-bottom: 5px;">Letra de C├â┬│digo (Prefijo)</label>
                 <input id="edit-letra" class="swal2-input" value="${letraActual}" style="margin: 0 0 5px 0; width: 100%;" maxlength="5">
-                <small style="color: #888;">Ejemplo: N (generará guías como N01, N02...)</small>
+                <small style="color: #888;">Ejemplo: N (generar├â┬í gu├â┬¡as como N01, N02...)</small>
 
                 <hr style="margin: 15px 0;">
-                <label style="display: block; font-weight: 600; margin-bottom: 5px;">Nueva Contraseña <span style="color:#888; font-weight:400;">(dejar vacío para no cambiar)</span></label>
-                <input id="edit-password" type="password" class="swal2-input" placeholder="Nueva contraseña..." style="margin: 0; width: 100%;">
+                <label style="display: block; font-weight: 600; margin-bottom: 5px;">Nueva Contrase├â┬▒a <span style="color:#888; font-weight:400;">(dejar vac├â┬¡o para no cambiar)</span></label>
+                <input id="edit-password" type="password" class="swal2-input" placeholder="Nueva contrase├â┬▒a..." style="margin: 0; width: 100%;">
             </div>
         `,
         focusConfirm: false,
@@ -3930,7 +3969,7 @@ async function editarEmpresa(empresaId, nombreActual, letraActual) {
         preConfirm: () => {
             const newPass = document.getElementById('edit-password').value.trim();
             if (newPass && newPass.length < 6) {
-                Swal.showValidationMessage('La contraseña debe tener al menos 6 caracteres');
+                Swal.showValidationMessage('La contrase├â┬▒a debe tener al menos 6 caracteres');
                 return false;
             }
             return {
@@ -3943,7 +3982,7 @@ async function editarEmpresa(empresaId, nombreActual, letraActual) {
 
     if (formValues) {
         if (!formValues.razon_social) {
-            return Swal.fire('Error', 'La Razón Social es obligatoria.', 'error');
+            return Swal.fire('Error', 'La Raz├â┬│n Social es obligatoria.', 'error');
         }
 
         showLoading(true);
@@ -3960,7 +3999,7 @@ async function editarEmpresa(empresaId, nombreActual, letraActual) {
             const data = await response.json();
             if (!data.success) throw new Error(data.error);
 
-            Swal.fire('Éxito', 'Empresa actualizada correctamente.', 'success');
+            Swal.fire('├âÔÇ░xito', 'Empresa actualizada correctamente.', 'success');
             renderListaUsuarios(); // Recargar lista
         } catch (error) {
             console.error('Error al editar empresa:', error);
@@ -3976,14 +4015,14 @@ async function vincularAliado(userId, currentEmpresaId) {
     let opcionesEmpresas = selectPadre ? selectPadre.innerHTML : '<option value="">No se pudieron cargar las empresas</option>';
 
     const { value: empresaId } = await Swal.fire({
-        title: '🔗 Vincular Aliado',
+        title: '├░┼©ÔÇØÔÇö Vincular Aliado',
         html: `
             <div style="text-align: left;">
-                <label style="display: block; font-weight: 600; margin-bottom: 5px;">Seleccione la Empresa Raíz</label>
+                <label style="display: block; font-weight: 600; margin-bottom: 5px;">Seleccione la Empresa Ra├â┬¡z</label>
                 <select id="vincular-empresa-select" class="swal2-select" style="display: flex; width: 100%; margin: 0;">
                     ${opcionesEmpresas}
                 </select>
-                <small style="color: #666; margin-top: 10px; display: block;">Este usuario aliado dependerá y compartirá las guías de la empresa seleccionada.</small>
+                <small style="color: #666; margin-top: 10px; display: block;">Este usuario aliado depender├â┬í y compartir├â┬í las gu├â┬¡as de la empresa seleccionada.</small>
             </div>
         `,
         focusConfirm: false,
@@ -4021,7 +4060,7 @@ async function vincularAliado(userId, currentEmpresaId) {
             const data = await response.json();
             if (!data.success) throw new Error(data.error);
 
-            Swal.fire('Éxito', data.message, 'success');
+            Swal.fire('├âÔÇ░xito', data.message, 'success');
             renderListaUsuarios(); // Recargar lista
         } catch (error) {
             console.error('Error al vincular aliado:', error);
@@ -4037,19 +4076,19 @@ async function vincularAliado(userId, currentEmpresaId) {
 function renderDashboardFiscalizador(container) {
     container.innerHTML = `
         <div class="content-header">
-            <h2 class="content-title">Panel de Fiscalización</h2>
+            <h2 class="content-title">Panel de Fiscalizaci├â┬│n</h2>
         </div>
         
         <div class="stats-grid" style="grid-template-columns: 1fr;">
             <div class="stat-card">
-                <h3>Verificación Rápida</h3>
-                <p style="color: #666; margin-bottom: 20px;">Use el escáner para verificar guías en puntos de control.</p>
+                <h3>Verificaci├â┬│n R├â┬ípida</h3>
+                <p style="color: #666; margin-bottom: 20px;">Use el esc├â┬íner para verificar gu├â┬¡as en puntos de control.</p>
                 <div style="display: flex; flex-direction: column; gap: 15px; align-items: center; padding: 20px; border: 2px dashed #1a5f7a; border-radius: 12px; background: rgba(26, 95, 122, 0.05);">
-                    <div style="font-size: 48px;">📷</div>
+                    <div style="font-size: 48px;">├░┼©ÔÇ£┬À</div>
                     <button class="btn btn-primary" onclick="startFiscalizadorScanner()">
-                        <span>🔍</span> Escanear Código QR
+                        <span>├░┼©ÔÇØ┬ì</span> Escanear C├â┬│digo QR
                     </button>
-                    <p style="font-size: 12px; color: #666;">Permite registrar la verificación oficial en el sistema.</p>
+                    <p style="font-size: 12px; color: #666;">Permite registrar la verificaci├â┬│n oficial en el sistema.</p>
                 </div>
             </div>
         </div>
@@ -4071,10 +4110,10 @@ function renderDashboardFiscalizador(container) {
                         <input type="date" id="historial-end-date" class="form-control">
                     </div>
                     <button class="btn btn-secondary" onclick="loadHistorialVerificaciones()">
-                        <span>🔍</span> Filtrar
+                        <span>├░┼©ÔÇØ┬ì</span> Filtrar
                     </button>
                     <button class="btn btn-success" onclick="descargarReporteVerificaciones()">
-                        <span>📄</span> Descargar PDF
+                        <span>├░┼©ÔÇ£ÔÇ×</span> Descargar PDF
                     </button>
                 </div>
             </div>
@@ -4083,16 +4122,16 @@ function renderDashboardFiscalizador(container) {
             </div>
         </div>
 
-        <!-- Contenedor flotante para el escáner del fiscalizador -->
+        <!-- Contenedor flotante para el esc├â┬íner del fiscalizador -->
         <div id="fiscalizador-scanner-modal" class="modal" style="display:none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); align-items:center; justify-content:center;">
              <div style="width: 90%; max-width: 500px; background: #fff; border-radius: 12px; overflow: hidden; position: relative;">
                 <div style="padding: 15px; background: #1a5f7a; color: #fff; display: flex; justify-content: space-between;">
-                    <h3 style="margin:0; font-size: 16px;">Escáner de Fiscalización</h3>
-                    <span onclick="stopFiscalizadorScanner()" style="cursor:pointer; font-weight:bold;">✕</span>
+                    <h3 style="margin:0; font-size: 16px;">Esc├â┬íner de Fiscalizaci├â┬│n</h3>
+                    <span onclick="stopFiscalizadorScanner()" style="cursor:pointer; font-weight:bold;">├ó┼ôÔÇó</span>
                 </div>
                 <div id="fiscalizador-qr-reader" style="width: 100%;"></div>
                 <div style="padding: 15px; text-align: center;">
-                    <p style="font-size: 13px; color: #666;">Enfoque el código QR de la guía para verificarla.</p>
+                    <p style="font-size: 13px; color: #666;">Enfoque el c├â┬│digo QR de la gu├â┬¡a para verificarla.</p>
                     <button class="btn btn-secondary" onclick="stopFiscalizadorScanner()" style="width:100%;">Cancelar</button>
                 </div>
              </div>
@@ -4110,7 +4149,7 @@ async function obtenerReporteEstadistico() {
     const countDiv = document.getElementById('stats-total-count');
 
     if (!start || !end) {
-        return Swal.fire('Atención', 'Seleccione ambas fechas para filtrar.', 'info');
+        return Swal.fire('Atenci├â┬│n', 'Seleccione ambas fechas para filtrar.', 'info');
     }
 
     try {
@@ -4130,7 +4169,7 @@ async function obtenerReporteEstadistico() {
     }
 }
 
-// ===== GESTIÓN DE SEGURIDAD (CAMBIAR CLAVE) =====
+// ===== GESTI├âÔÇ£N DE SEGURIDAD (CAMBIAR CLAVE) =====
 function renderCambiarClave(container) {
     container.innerHTML = `
         <div class="content-header">
@@ -4139,23 +4178,23 @@ function renderCambiarClave(container) {
         
         <div class="stats-grid" style="grid-template-columns: 1fr; max-width: 500px;">
             <div class="stat-card">
-                <h3>Cambiar Contraseña</h3>
-                <p style="color: #666; margin-bottom: 20px; font-size: 14px;">Actualice su contraseña periódicamente para mantener su cuenta segura.</p>
+                <h3>Cambiar Contrase├â┬▒a</h3>
+                <p style="color: #666; margin-bottom: 20px; font-size: 14px;">Actualice su contrase├â┬▒a peri├â┬│dicamente para mantener su cuenta segura.</p>
                 
                 <form onsubmit="handleCambiarClave(event)" style="display: flex; flex-direction: column; gap: 15px;">
                     <div class="form-group">
-                        <label>Contraseña Actual</label>
+                        <label>Contrase├â┬▒a Actual</label>
                         <input type="password" id="pass-actual" class="form-control" required>
                     </div>
                     <div class="form-group">
-                        <label>Nueva Contraseña</label>
+                        <label>Nueva Contrase├â┬▒a</label>
                         <input type="password" id="pass-nueva" class="form-control" required minlength="6" placeholder="Min. 6 caracteres">
                     </div>
                     <div class="form-group">
-                        <label>Confirmar Nueva Contraseña</label>
+                        <label>Confirmar Nueva Contrase├â┬▒a</label>
                         <input type="password" id="pass-confirm" class="form-control" required minlength="6">
                     </div>
-                    <button type="submit" class="btn btn-primary">Actualizar Contraseña</button>
+                    <button type="submit" class="btn btn-primary">Actualizar Contrase├â┬▒a</button>
                 </form>
             </div>
         </div>
@@ -4169,7 +4208,7 @@ async function handleCambiarClave(event) {
     const confirmPassword = document.getElementById('pass-confirm').value;
 
     if (newPassword !== confirmPassword) {
-        return Swal.fire('Error', 'Las contraseñas nuevas no coinciden.', 'error');
+        return Swal.fire('Error', 'Las contrase├â┬▒as nuevas no coinciden.', 'error');
     }
 
     try {
@@ -4185,7 +4224,7 @@ async function handleCambiarClave(event) {
         const data = await response.json();
         if (!data.success) throw new Error(data.error);
 
-        Swal.fire('Éxito', 'Su contraseña ha sido actualizada.', 'success');
+        Swal.fire('├âÔÇ░xito', 'Su contrase├â┬▒a ha sido actualizada.', 'success');
         event.target.reset();
 
     } catch (error) {
@@ -4194,7 +4233,7 @@ async function handleCambiarClave(event) {
     }
 }
 
-// ===== LÓGICA DE ESCANEO Y VERIFICACIÓN (FISCALIZADOR) =====
+// ===== L├âÔÇ£GICA DE ESCANEO Y VERIFICACI├âÔÇ£N (FISCALIZADOR) =====
 let fiscalizadorScanner = null;
 
 async function startFiscalizadorScanner() {
@@ -4216,8 +4255,8 @@ async function startFiscalizadorScanner() {
             onFiscalizadorScanSuccess
         );
     } catch (err) {
-        console.error("Error al iniciar escáner fiscalizador:", err);
-        Swal.fire('Error', 'No se pudo acceder a la cámara.', 'error');
+        console.error("Error al iniciar esc├â┬íner fiscalizador:", err);
+        Swal.fire('Error', 'No se pudo acceder a la c├â┬ímara.', 'error');
         stopFiscalizadorScanner();
     }
 }
@@ -4230,7 +4269,7 @@ function stopFiscalizadorScanner() {
         fiscalizadorScanner.stop().then(() => {
             fiscalizadorScanner.clear();
             fiscalizadorScanner = null;
-        }).catch(err => console.error("Error al detener escáner:", err));
+        }).catch(err => console.error("Error al detener esc├â┬íner:", err));
     }
 }
 
@@ -4243,11 +4282,11 @@ async function onFiscalizadorScanSuccess(decodedText) {
         const guiaId = pathParts[pathParts.length - 1];
 
         if (!guiaId || guiaId.length < 20) {
-            throw new Error('Código QR no válido para el sistema.');
+            throw new Error('C├â┬│digo QR no v├â┬ílido para el sistema.');
         }
 
         Swal.fire({
-            title: 'Verificando Guía...',
+            title: 'Verificando Gu├â┬¡a...',
             allowOutsideClick: false,
             didOpen: () => Swal.showLoading()
         });
@@ -4270,20 +4309,20 @@ async function onFiscalizadorScanSuccess(decodedText) {
         const statusBg = 'rgba(40, 167, 69, 0.1)';
 
         Swal.fire({
-            title: 'Verificación de Guía',
+            title: 'Verificaci├â┬│n de Gu├â┬¡a',
             html: `
                 <div style="text-align: left; font-size: 14px; font-family: 'Inter', system-ui, -apple-system, sans-serif;">
                     <div style="text-align: center; margin-bottom: 20px; padding: 15px; border-radius: 12px; background: ${statusBg}; border: 2.5px solid ${statusColor}; color: ${statusColor}; font-weight: 800; font-size: 16px; letter-spacing: 0.5px;">
-                        ✅ GUÍA VERIFICADA Y REGISTRADA
+                        ├ó┼ôÔÇª GU├â┬ìA VERIFICADA Y REGISTRADA
                     </div>
-                    <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>N° Guía:</strong> ${g.numero_guia}</p>
+                    <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>N├é┬░ Gu├â┬¡a:</strong> ${g.numero_guia}</p>
                     <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Estado:</strong> <span style="background: ${g.estado === 'activa' ? '#e6f4ea' : '#fce8e6'}; color: ${g.estado === 'activa' ? '#1e8e3e' : '#d93025'}; padding: 2px 8px; border-radius: 20px; font-weight: 800; font-size: 11px;">${g.estado.toUpperCase()}</span></p>
                     <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Empresa:</strong> ${g.empresa_nombre}</p>
-                    <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Cliente:</strong> ${g.cliente_nombre || 'N/A'}<br><small style="color: #666; font-weight: 400;">📄 RIF/C.I: ${g.cliente_rif || 'N/A'}</small></p>
+                    <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Cliente:</strong> ${g.cliente_nombre || 'N/A'}<br><small style="color: #666; font-weight: 400;">├░┼©ÔÇ£ÔÇ× RIF/C.I: ${g.cliente_rif || 'N/A'}</small></p>
                     <p style="margin-bottom: 12px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Placa:</strong> <span style="font-family: monospace; font-size: 15px; background: #eee; padding: 1px 6px; border-radius: 4px;">${g.vehiculo_placa}</span></p>
                     
                     <div style="margin-top: 15px; padding: 15px; background: #fdfdfd; border-radius: 16px; border: 1px solid #eee; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
-                        <h4 style="margin: 0 0 12px; font-size: 13px; color: #1a5f7a; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #1a5f7a; padding-bottom: 6px; display: inline-block;">📦 Minerales Transportados</h4>
+                        <h4 style="margin: 0 0 12px; font-size: 13px; color: #1a5f7a; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #1a5f7a; padding-bottom: 6px; display: inline-block;">├░┼©ÔÇ£┬ª Minerales Transportados</h4>
                         <div style="display: flex; flex-direction: column; gap: 8px;">
                             ${g.materiales && g.materiales.length > 0 ? 
                                 g.materiales.map(m => `
@@ -4309,7 +4348,7 @@ async function onFiscalizadorScanSuccess(decodedText) {
 
     } catch (error) {
         console.error('Error en escaneo fiscalizador:', error);
-        Swal.fire('Error', error.message || 'Error al procesar el código.', 'error');
+        Swal.fire('Error', error.message || 'Error al procesar el c├â┬│digo.', 'error');
     }
 }
 
@@ -4334,7 +4373,7 @@ async function loadHistorialVerificaciones() {
         if (!data.success) throw new Error(data.error);
 
         if (data.verificaciones.length === 0) {
-            tableContainer.innerHTML = '<div class="info-message">Aún no ha verificado ninguna guía.</div>';
+            tableContainer.innerHTML = '<div class="info-message">A├â┬║n no ha verificado ninguna gu├â┬¡a.</div>';
             return;
         }
 
@@ -4344,8 +4383,8 @@ async function loadHistorialVerificaciones() {
                     <thead>
                         <tr>
                             <th>Fecha</th>
-                            <th>Guía #</th>
-                            <th>Vehículo</th>
+                            <th>Gu├â┬¡a #</th>
+                            <th>Veh├â┬¡culo</th>
                             <th>Material</th>
                             <th>Empresa</th>
                         </tr>
@@ -4376,10 +4415,10 @@ async function descargarReporteVerificaciones() {
     const end = document.getElementById('historial-end-date')?.value;
 
     if (!start || !end) {
-        return Swal.fire('Atención', 'Seleccione un rango de fechas (Desde/Hasta) para generar el PDF.', 'info');
+        return Swal.fire('Atenci├â┬│n', 'Seleccione un rango de fechas (Desde/Hasta) para generar el PDF.', 'info');
     }
 
-    // Si estamos en entorno Capacitor/Móvil, usamos el navegador del sistema para las descargas
+    // Si estamos en entorno Capacitor/M├â┬│vil, usamos el navegador del sistema para las descargas
     if (window.Capacitor && window.Capacitor.getPlatform() !== 'web') {
         const downloadUrl = `${API_BASE}/reportes/verificaciones-pdf?startDate=${start}&endDate=${end}&token=${authToken}`;
         window.open(downloadUrl, '_system');
@@ -4423,25 +4462,25 @@ async function descargarReporteVerificaciones() {
 
 async function purgarSistema() {
     const { value: password } = await Swal.fire({
-        title: '⚠️ ACCIÓN CRÍTICA',
+        title: '├ó┼í┬á├»┬©┬Å ACCI├âÔÇ£N CR├â┬ìTICA',
         html: `
             <div style="text-align: left; background: #fff8f8; padding: 15px; border-radius: 10px; border: 1px solid #ffccba; font-size: 14px; line-height: 1.5;">
-                <p style="margin-bottom: 10px; color: #dc3545; font-weight: 700;">Esta acción ELIMINARÁ TODAS LAS GUÍAS, PAGOS Y RASTREOS del sistema de forma permanente.</p>
+                <p style="margin-bottom: 10px; color: #dc3545; font-weight: 700;">Esta acci├â┬│n ELIMINAR├â┬ü TODAS LAS GU├â┬ìAS, PAGOS Y RASTREOS del sistema de forma permanente.</p>
                 <ul style="margin-left: 20px; color: #333;">
-                    <li><strong>SE BORRARÁ</strong>: Guías, Pagos, Verificaciones, Tracking, Confirmaciones.</li>
-                    <li><strong style="color: #27ae60;">NO SE BORRARÁ</strong>: Usuarios ni Empresas (sus cuentas seguirán activas).</li>
+                    <li><strong>SE BORRAR├â┬ü</strong>: Gu├â┬¡as, Pagos, Verificaciones, Tracking, Confirmaciones.</li>
+                    <li><strong style="color: #27ae60;">NO SE BORRAR├â┬ü</strong>: Usuarios ni Empresas (sus cuentas seguir├â┬ín activas).</li>
                 </ul>
             </div>
-            <p style="margin-top: 15px; font-size: 13px;">Ingrese la contraseña de seguridad para continuar:</p>
+            <p style="margin-top: 15px; font-size: 13px;">Ingrese la contrase├â┬▒a de seguridad para continuar:</p>
         `,
         input: 'password',
-        inputPlaceholder: 'Contraseña de seguridad',
+        inputPlaceholder: 'Contrase├â┬▒a de seguridad',
         inputAttributes: {
             autocapitalize: 'off',
             autocorrect: 'off'
         },
         showCancelButton: true,
-        confirmButtonText: 'ELIMINAR GUÍAS',
+        confirmButtonText: 'ELIMINAR GU├â┬ìAS',
         confirmButtonColor: '#dc3545',
         cancelButtonText: 'Cancelar'
     });
@@ -4449,17 +4488,17 @@ async function purgarSistema() {
     if (!password) return;
 
     if (password !== '2708') {
-        return Swal.fire('Error', 'Contraseña incorrecta. Acción cancelada por seguridad.', 'error');
+        return Swal.fire('Error', 'Contrase├â┬▒a incorrecta. Acci├â┬│n cancelada por seguridad.', 'error');
     }
 
     const { isConfirmed } = await Swal.fire({
-        title: '¿Está TOTALMENTE seguro?',
-        text: "Se borrarán absolutamente todos los registros de guías y pagos. Los usuarios y empresas NO sufrirán cambios.",
+        title: '├é┬┐Est├â┬í TOTALMENTE seguro?',
+        text: "Se borrar├â┬ín absolutamente todos los registros de gu├â┬¡as y pagos. Los usuarios y empresas NO sufrir├â┬ín cambios.",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#dc3545',
         cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Sí, borrar todas las guías',
+        confirmButtonText: 'S├â┬¡, borrar todas las gu├â┬¡as',
         cancelButtonText: 'No, cancelar'
     });
 
@@ -4497,11 +4536,10 @@ async function purgarSistema() {
     }
 }
 
-/**
- * Gestión de Minerales (Solo para Master)
- */
+// ===== GESTI├ôN DE MINERALES =====
 async function renderMinerales(container) {
     showLoading(true);
+
     try {
         const response = await apiRequest('/minerales/todos');
         const minerales = response.minerales;
@@ -4509,55 +4547,49 @@ async function renderMinerales(container) {
         container.innerHTML = `
             <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
                 <div>
-                    <h1 class="dashboard-title">💎 Gestión de Minerales</h1>
+                    <h1 class="dashboard-title">Gesti├│n de Minerales</h1>
                     <p class="dashboard-subtitle">Administre los tipos de minerales disponibles en el sistema</p>
                 </div>
-                <button class="btn btn-primary" onclick="mostrarModalAgregarMineral()">
-                    <span>➕</span> Agregar Nuevo Mineral
+                <button class="btn btn-primary" onclick="mostrarModalNuevoMineral()">
+                    + Nuevo Mineral
                 </button>
             </div>
 
             <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Listado de Minerales</h2>
-                </div>
-                <div class="table-wrapper">
-                    <table>
+                <div class="table-responsive">
+                    <table class="table">
                         <thead>
                             <tr>
                                 <th>Nombre del Mineral</th>
                                 <th>Estado</th>
-                                <th>Fecha de Registro</th>
+                                <th>Fecha Registro</th>
                                 <th>Acciones</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            ${minerales.map(m => `
+                        <tbody id="minerales-table-body">
+                            ${minerales.length === 0 ? '<tr><td colspan="4" style="text-align: center;">No hay minerales registrados</td></tr>' : 
+                                minerales.map(m => `
                                 <tr>
-                                    <td style="font-weight: 600;">${m.nombre}</td>
-                                    <td>
-                                        <span class="status-badge ${m.activo ? 'status-active' : 'status-expired'}">
+                                    <td data-label="Nombre">${m.nombre}</td>
+                                    <td data-label="Estado">
+                                        <span class="badge ${m.activo ? 'badge-success' : 'badge-danger'}">
                                             ${m.activo ? 'Activo' : 'Inactivo'}
                                         </span>
                                     </td>
-                                    <td>${formatDate(m.created_at)}</td>
-                                    <td>
-                                        <div style="display: flex; gap: 8px;">
-                                            <button class="btn btn-sm ${m.activo ? 'btn-secondary' : 'btn-success'}" 
-                                                    onclick="toggleEstadoMineral('${m.id}', ${!m.activo})" 
-                                                    style="padding: 4px 10px; font-size: 11px;">
+                                    <td data-label="Registro">${new Date(m.created_at).toLocaleDateString()}</td>
+                                    <td data-label="Acciones">
+                                        <div style="display: flex; gap: 10px;">
+                                            <button class="btn btn-sm ${m.activo ? 'btn-outline' : 'btn-success'}" 
+                                                onclick="toggleMineralStatus('${m.id}', ${m.activo})">
                                                 ${m.activo ? 'Desactivar' : 'Activar'}
                                             </button>
-                                            <button class="btn btn-danger btn-sm" 
-                                                    onclick="eliminarMineralUI('${m.id}', '${m.nombre}')" 
-                                                    style="padding: 4px 10px; font-size: 11px;">
-                                                Eliminar
+                                            <button class="btn btn-danger btn-sm" onclick="eliminarMineral('${m.id}', '${m.nombre}')">
+                                                Borrar
                                             </button>
                                         </div>
                                     </td>
                                 </tr>
                             `).join('')}
-                            ${minerales.length === 0 ? '<tr><td colspan="4" style="text-align: center; padding: 30px; color: #888;">No hay minerales registrados.</td></tr>' : ''}
                         </tbody>
                     </table>
                 </div>
@@ -4565,100 +4597,124 @@ async function renderMinerales(container) {
         `;
     } catch (error) {
         console.error('Error al cargar minerales:', error);
-        container.innerHTML = `
-            <div class="error-message">
-                Error al cargar la lista de minerales: ${error.message || 'Error desconocido'}
-            </div>
-        `;
+        container.innerHTML = '<div class="error-message">Error al cargar la lista de minerales</div>';
     } finally {
         showLoading(false);
     }
 }
 
-async function mostrarModalAgregarMineral() {
+async function mostrarModalNuevoMineral() {
     const { value: nombre } = await Swal.fire({
         title: 'Agregar Nuevo Mineral',
         input: 'text',
-        inputLabel: 'Nombre del mineral',
-        inputPlaceholder: 'Ej: Arena Lavada, Canto Rodado...',
+        inputLabel: 'Nombre del Mineral',
+        inputPlaceholder: 'Ej: Arena de Rio, Granito...',
         showCancelButton: true,
-        confirmButtonText: 'Guardar Mineral',
+        confirmButtonText: 'Guardar',
         cancelButtonText: 'Cancelar',
         inputValidator: (value) => {
-            if (!value) return 'El nombre es obligatorio';
+            if (!value) {
+                return 'El nombre es requerido';
+            }
         }
     });
 
     if (nombre) {
         showLoading(true);
         try {
-            const response = await apiRequest('/minerales', 'POST', { nombre });
-            if (response.success) {
-                Swal.fire('¡Éxito!', 'Mineral agregado correctamente', 'success');
+            const response = await fetch(`${API_BASE}/minerales`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ nombre })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                Swal.fire('Guardado', 'El mineral ha sido registrado correctamente', 'success');
                 renderMinerales(document.getElementById('dashboard-content'));
             } else {
-                throw new Error(response.error);
+                throw new Error(data.error || 'Error al guardar');
             }
         } catch (error) {
-            Swal.fire('Error', error.message || 'No se pudo agregar el mineral', 'error');
+            Swal.fire('Error', error.message, 'error');
         } finally {
             showLoading(false);
         }
     }
 }
 
-async function toggleEstadoMineral(id, nuevoEstado) {
-    const action = nuevoEstado ? 'activar' : 'desactivar';
-    const confirm = await Swal.fire({
-        title: `¿Desea ${action} este mineral?`,
-        text: `El mineral ${nuevoEstado ? 'volverá a aparecer' : 'ya no aparecerá'} en el formulario de solicitud.`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: `Sí, ${action}`,
-        cancelButtonText: 'Cancelar'
-    });
-
-    if (confirm.isConfirmed) {
-        showLoading(true);
-        try {
-            const response = await apiRequest(`/minerales/${id}`, 'PUT', { activo: nuevoEstado });
-            if (response.success) {
-                Swal.fire('Actualizado', `Mineral ${nuevoEstado ? 'activado' : 'desactivado'} correctamente`, 'success');
-                renderMinerales(document.getElementById('dashboard-content'));
-            } else {
-                throw new Error(response.error);
-            }
-        } catch (error) {
-            Swal.fire('Error', error.message || 'No se pudo actualizar el estado', 'error');
-        } finally {
-            showLoading(false);
-        }
-    }
-}
-
-async function eliminarMineralUI(id, nombre) {
-    const confirm = await Swal.fire({
-        title: '¿Eliminar mineral?',
-        text: `Esta acción intentará borrar el mineral "${nombre}". Solo se puede eliminar si nunca ha sido utilizado en una guía.`,
+async function toggleMineralStatus(id, currentStatus) {
+    const result = await Swal.fire({
+        title: '┬┐Cambiar estado?',
+        text: `┬┐Est├í seguro de ${currentStatus ? 'desactivar' : 'activar'} este mineral?`,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#dc3545',
-        confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar'
+        confirmButtonText: 'S├¡, cambiar',
+        cancelButtonText: 'No, cancelar'
     });
 
-    if (confirm.isConfirmed) {
+    if (result.isConfirmed) {
         showLoading(true);
         try {
-            const response = await apiRequest(`/minerales/${id}`, 'DELETE');
-            if (response.success) {
-                Swal.fire('Eliminado', 'El mineral ha sido borrado del sistema.', 'success');
+            const response = await fetch(`${API_BASE}/minerales/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ activo: !currentStatus })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
                 renderMinerales(document.getElementById('dashboard-content'));
             } else {
-                throw new Error(response.error);
+                throw new Error(data.error || 'Error al actualizar');
             }
         } catch (error) {
-            Swal.fire('Error', error.message || 'No se pudo eliminar el mineral', 'error');
+            Swal.fire('Error', error.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    }
+}
+
+async function eliminarMineral(id, nombre) {
+    const result = await Swal.fire({
+        title: '┬┐Eliminar mineral?',
+        text: `Est├í a punto de eliminar permanentemente el mineral "${nombre}". Esta acci├│n no se puede deshacer.`,
+        icon: 'error',
+        showCancelButton: true,
+        confirmButtonText: 'S├¡, eliminar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc3545'
+    });
+
+    if (result.isConfirmed) {
+        showLoading(true);
+        try {
+            const response = await fetch(`${API_BASE}/minerales/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                Swal.fire('Eliminado', 'El mineral ha sido borrado', 'success');
+                renderMinerales(document.getElementById('dashboard-content'));
+            } else {
+                throw new Error(data.error || 'Error al eliminar');
+            }
+        } catch (error) {
+            Swal.fire('Error', error.message, 'error');
         } finally {
             showLoading(false);
         }
