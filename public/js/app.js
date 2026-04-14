@@ -3143,7 +3143,7 @@ function agregarFilaMaterial() {
             <label style="font-size: 12px; margin-bottom: 4px;">Unidad</label>
             <select name="material_unidad[]" class="form-control" required onchange="calcularImpuestoEstimado()">
                 <option value="toneladas">Ton</option>
-                <option value="mÂ³">mÂ³</option>
+                <option value="m³">m³</option>
                 <option value="kg">kg</option>
             </select>
         </div>
