@@ -1,18 +1,7 @@
 {
   "version": 2,
-  "name": "sistema-minerales-laguaira",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/verificar/(.*)", "destination": "/api" }
-  ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, PUT, DELETE, OPTIONS, PATCH" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, X-Requested-With" }
-      ]
-    }
   ]
 }
