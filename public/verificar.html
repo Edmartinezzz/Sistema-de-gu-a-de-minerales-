@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="description" content="Verificación de Guías de Movilización - Estado La Guaira">
+    <meta name="theme-color" content="#1a5f7a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Verificar Guía - Sistema de Minerales</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .verification-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .verification-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            overflow: hidden;
+        }
+        .verification-container.qr-mode {
+            border-radius: 0;
+            max-width: 100%;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow: none;
+        }
+        .verification-page.qr-mode {
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .verification-header {
+            background: linear-gradient(135deg, #1a5f7a 0%, #155066 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .verification-header h1 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .verification-header p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        .verification-form {
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .verification-form p {
+            margin-bottom: 15px;
+            color: #666;
+        }
+        .verification-result {
+            padding: 0;
+            animation: fadeInUp 0.5s ease-out;
+        }
+        .verification-result.valid {
+            background: white;
+        }
+        .verification-result.invalid,
+        .verification-result.error,
+        .verification-result.fake {
+            padding: 30px 20px;
+            text-align: center;
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+        .checkmark-animation {
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: #1a5f7a;
+        }
+        .btn {
+            padding: 12px 30px;
+            background: #1a5f7a;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            background: #155066;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(26, 95, 122, 0.3);
+        }
+        @media (max-width: 768px) {
+            .verification-container {
+                border-radius: 15px;
+            }
+            .verification-container.qr-mode {
+                border-radius: 0;
+                padding: 10px;
+            }
+            .verification-header {
+                padding: 25px 15px;
+            }
+            .verification-header h1 {
+                font-size: 24px;
+            }
+            .verification-result.valid h1 {
+                font-size: 28px !important;
+            }
+            .verification-result.valid div[style*="font-size: 42px"],
+            .verification-result.valid div[style*="font-size: 48px"] {
+                font-size: 32px !important;
+            }
+            .checkmark-animation {
+                font-size: 70px !important;
+            }
+            .verification-result.valid div[style*="padding: 30px 20px"] {
+                padding: 20px 15px !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="verification-page">
+        <div class="verification-container">
+            <div class="verification-header">
+                <div class="gov-seal"></div>
+                <h1>Verificación de Guía</h1>
+                <p>Sistema de Control de Minerales - Estado La Guaira</p>
+            </div>
+
+            <div class="verification-form">
+                <p>Ingrese el ID de la guía o escanee el código QR:</p>
+                <input type="text" id="guia-id-input" placeholder="ID de la guía" class="form-control">
+                <button id="verificar-btn" class="btn btn-primary">Verificar</button>
+            </div>
+
+            <div id="verification-result" class="verification-result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Detectar si se accede desde QR (por URL o parámetros)
+        function getGuiaIdFromUrl() {
+            // Intentar obtener desde pathname
+            const pathMatch = window.location.pathname.match(/\/verificar\/([^\/]+)/);
+            if (pathMatch) return pathMatch[1];
+            
+            // Intentar desde hash
+            const hashMatch = window.location.hash.match(/verificar\/([^\/]+)/);
+            if (hashMatch) return hashMatch[1];
+            
+            // Intentar desde query params
+            const params = new URLSearchParams(window.location.search);
+            return params.get('id') || params.get('guia');
+        }
+
+        const guiaIdFromUrl = getGuiaIdFromUrl();
+        
+        // Si hay ID en la URL, procesar inmediatamente
+        if (guiaIdFromUrl) {
+            // Ocultar formulario y header cuando se accede desde QR para mostrar solo el resultado
+            document.querySelector('.verification-form').style.display = 'none';
+            document.querySelector('.verification-header').style.display = 'none';
+            document.querySelector('.verification-container').classList.add('qr-mode');
+            document.querySelector('.verification-page').classList.add('qr-mode');
+            document.getElementById('guia-id-input').value = guiaIdFromUrl;
+            
+            // Mostrar el contenedor de resultados inmediatamente
+            const resultDiv = document.getElementById('verification-result');
+            resultDiv.style.display = 'block';
+            
+            // Verificar inmediatamente sin esperar
+            setTimeout(() => {
+                verificarGuia(guiaIdFromUrl);
+            }, 50);
+        }
+
+        document.getElementById('verificar-btn').addEventListener('click', () => {
+            const guiaId = document.getElementById('guia-id-input').value.trim();
+            if (guiaId) {
+                verificarGuia(guiaId);
+            }
+        });
+
+        async function verificarGuia(guiaId) {
+            const resultDiv = document.getElementById('verification-result');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = `
+                <div style="text-align: center; padding: 40px 20px;">
+                    <div style="font-size: 50px; margin-bottom: 20px; animation: pulse 1.5s ease-in-out infinite;">🔍</div>
+                    <p style="font-size: 18px; color: #666; font-weight: 600;">Verificando guía...</p>
+                    <div style="width: 60px; height: 4px; background: linear-gradient(90deg, #1a5f7a, #20c997); margin: 20px auto; border-radius: 2px; animation: pulse 1.5s ease-in-out infinite;"></div>
+                </div>
+            `;
+
+            try {
+                const response = await fetch(`/api/guias/verificar/${guiaId}`);
+                const data = await response.json();
+
+                if (data.success && data.valida) {
+                    resultDiv.className = 'verification-result valid';
+                    resultDiv.innerHTML = `
+                        <div style="text-align: center; padding: 30px 20px;">
+                            <div class="checkmark-animation" style="font-size: 100px; margin-bottom: 20px; display: inline-block;">✅</div>
+                            <h1 style="color: #28a745; font-size: 36px; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);">
+                                Guía Verificada y Real
+                            </h1>
+                            <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 30px 25px; border-radius: 20px; margin: 30px 0; box-shadow: 0 10px 30px rgba(40, 167, 69, 0.4); position: relative; overflow: hidden;">
+                                <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); pointer-events: none;"></div>
+                                <p style="font-size: 13px; margin: 0 0 12px 0; opacity: 0.95; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; position: relative; z-index: 1;">Código de la Guía</p>
+                                <p style="font-size: 48px; font-weight: bold; margin: 0; letter-spacing: 4px; font-family: 'Courier New', monospace; text-shadow: 0 2px 8px rgba(0,0,0,0.2); position: relative; z-index: 1;">
+                                    ${data.guia.numero_guia}
+                                </p>
+                            </div>
+                            <div style="background: linear-gradient(to bottom, #ffffff 0%, #f8f9fa 100%); padding: 25px; border-radius: 15px; margin-top: 25px; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #e9ecef;">
+                                <p style="margin: 10px 0; font-size: 15px;"><strong style="color: #495057;">Estado:</strong> <span style="background: linear-gradient(135deg, #28a745, #20c997); color: white; padding: 6px 16px; border-radius: 25px; font-size: 12px; font-weight: bold; display: inline-block; box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);">${data.guia.estado.toUpperCase()}</span></p>
+                                <p style="margin: 10px 0; font-size: 15px; color: #495057;"><strong>Empresa:</strong> <span style="color: #212529;">${data.guia.empresa}</span></p>
+                                <p style="margin: 10px 0; font-size: 15px; color: #495057;"><strong>Placa:</strong> <span style="color: #212529; font-weight: 600;">${data.guia.vehiculo_placa || 'N/A'}</span></p>
+                                <p style="margin: 10px 0; font-size: 15px; color: #495057;"><strong>Mineral:</strong> <span style="color: #212529;">${data.guia.mineral}</span></p>
+                                <p style="margin: 10px 0; font-size: 15px; color: #495057;"><strong>Cantidad:</strong> <span style="color: #212529; font-weight: 600;">${data.guia.cantidad}</span></p>
+                                <p style="margin: 10px 0; font-size: 15px; color: #495057;"><strong>Válida hasta:</strong> <span style="color: #212529;">${new Date(data.guia.fecha_vencimiento).toLocaleDateString('es-VE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span></p>
+                            </div>
+                            <div style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #e8f5e9 0%, #d4edda 100%); border-left: 5px solid #28a745; border-radius: 12px; box-shadow: 0 4px 12px rgba(40, 167, 69, 0.15);">
+                                <p style="margin: 0; color: #155724; font-weight: 700; font-size: 17px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                                    <span style="font-size: 24px;">✓</span>
+                                    <span>Esta guía es auténtica y está registrada en el sistema oficial</span>
+                                </p>
+                            </div>
+                        </div>
+                    `;
+                } else if (data.success && !data.valida) {
+                    if (data.guia && data.guia.estado === 'usada') {
+                        // ALERTA DE REUSO
+                        resultDiv.className = 'verification-result error';
+                        resultDiv.innerHTML = `
+                            <h2>⛔ GUÍA YA UTILIZADA</h2>
+                            <div class="guia-details" style="border-color: #dc3545;">
+                                <p style="font-size: 1.2em; font-weight: bold; color: #dc3545;">⚠️ ALERTA DE SEGURIDAD</p>
+                                <p>Esta guía <strong>YA FUE USADA</strong> anteriormente.</p>
+                                <p><strong>Fecha de Uso:</strong> ${data.guia.fecha_uso ? new Date(data.guia.fecha_uso).toLocaleString('es-VE') : 'Registrada'}</p>
+                                <hr>
+                                <p><strong>Número:</strong> ${data.guia.numero_guia}</p>
+                                <p><strong>Placa:</strong> ${data.guia.vehiculo_placa}</p>
+                            </div>
+                        `;
+                    } else {
+                        // Otras invalidez (pendientes, vencidas)
+                        resultDiv.className = 'verification-result invalid';
+                        resultDiv.innerHTML = `
+                            <h2>⚠ GUÍA NO VÁLIDA</h2>
+                            <div class="guia-details">
+                                <p><strong>Estado:</strong> <span class="badge badge-warning">${data.guia ? data.guia.estado.toUpperCase() : 'DESCONOCIDO'}</span></p>
+                                <p>Esta guía no está activa para movilización.</p>
+                            </div>
+                        `;
+                    }
+                } else {
+                    resultDiv.className = 'verification-result fake';
+                    resultDiv.innerHTML = `
+                        <h2>✗ GUÍA FALSA</h2>
+                        <p>Esta guía no se encuentra en el sistema. Posible falsificación.</p>
+                        <p class="warning">Reporte este caso a las autoridades.</p>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.className = 'verification-result error';
+                resultDiv.innerHTML = `
+                    <h2>Error</h2>
+                    <p>No se pudo verificar la guía. Intente nuevamente.</p>
+                `;
+            }
+        }
+    </script>
+</body>
+
+</html>
