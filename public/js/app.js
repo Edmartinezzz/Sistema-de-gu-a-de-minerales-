@@ -1116,7 +1116,7 @@ async function loadEmpresaDashboard(container) {
                 <h1 class="dashboard-title">Panel de Empresa</h1>
                 <p class="dashboard-subtitle">Bienvenido, ${currentUser.empresa_nombre}</p>
                 <button class="btn btn-primary mt-2" onclick="mostrarFormularioGuia()">
-                    <span>âž•</span>
+                    <span>➕</span>
                     Solicitar Nueva Guía
                 </button>
             </div>
@@ -1143,7 +1143,7 @@ async function loadEmpresaDashboard(container) {
             ${guias.length > 0 ? `
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">ðŸ“„ Mis Guías de Movilización</h2>
+                        <h2 class="card-title">📄 Mis Guías de Movilización</h2>
                     </div>
                     <div class="card-body">
                         ${guias.slice(0, 5).map(guia => `
@@ -1215,11 +1215,11 @@ async function loadEmpresaDashboard(container) {
             ` : `
                 <div class="card">
                     <div class="card-body text-center" style="padding: 60px 20px;">
-                        <div style="font-size: 64px; margin-bottom: 20px;">ðŸ“„</div>
+                        <div style="font-size: 64px; margin-bottom: 20px;">📄</div>
                         <h3 style="color: #6c757d; margin-bottom: 10px;">No tienes guías registradas</h3>
                         <p style="color: #adb5bd; margin-bottom: 30px;">Solicita tu primera guía de movilización</p>
                         <button class="btn btn-primary" onclick="mostrarFormularioGuia()">
-                            <span>âž•</span>
+                            <span>➕</span>
                             Solicitar Nueva Guía
                         </button>
                     </div>
@@ -1356,7 +1356,7 @@ async function loadGuiasSection(container) {
             // VISTA EMPRESA
             container.innerHTML = `
                 <div class="dashboard-header">
-                    <h1 class="dashboard-title">ðŸ“„ Mis Guías</h1>
+                    <h1 class="dashboard-title">📄 Mis Guías</h1>
                     <p class="dashboard-subtitle">Todas tus guías de movilización</p>
                 </div>
                 
@@ -1930,7 +1930,7 @@ async function mostrarFormularioGuia() {
 
             <div class="modal-footer" id="modal-footer-normal">
                 <button type="button" class="btn btn-secondary" onclick="cerrarModalGuia()">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="previsualizarGuia()" style="background: #007aff; padding: 10px 20px;">ðŸ“„ Previsualizar Guía</button>
+                <button type="button" class="btn btn-primary" onclick="previsualizarGuia()" style="background: #007aff; padding: 10px 20px;">📄 Previsualizar Guía</button>
             </div>
             <div class="modal-footer" id="modal-footer-preview" style="display: none;">
                 <button type="button" class="btn btn-secondary" onclick="cancelarPrevisualizacion()">â¬… Volver a Editar</button>
@@ -3371,7 +3371,7 @@ async function loadNotificationsContent() {
                     notifications = res.guias.slice(0, 5).map(g => {
                         let type = 'info';
                         let msg = `Guía #${g.numero_guia} creada`;
-                        let icon = 'ðŸ“„';
+                        let icon = '📄';
 
                         if (g.estado === 'activa') { type = 'success'; msg = `Guía #${g.numero_guia} APROBADA y Activa`; icon = 'âœ…'; }
                         if (g.estado === 'usada') { type = 'info'; msg = `Guía #${g.numero_guia} completada`; icon = 'ðŸšš'; }
@@ -3520,7 +3520,7 @@ async function verificarGuiaPublica(guiaId, hash) {
                         <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>N° Guía:</strong> ${g.numero_guia}</p>
                         <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Estado:</strong> <span style="background: ${g.estado === 'activa' ? '#e6f4ea' : '#fce8e6'}; color: ${g.estado === 'activa' ? '#1e8e3e' : '#d93025'}; padding: 2px 8px; border-radius: 20px; font-weight: 800; font-size: 11px;">${g.estado.toUpperCase()}</span></p>
                         <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Empresa:</strong> ${g.empresa_nombre}</p>
-                        <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Cliente:</strong> ${g.cliente_nombre || 'N/A'}<br><small style="color: #666; font-weight: 400;">ðŸ“„ RIF/C.I: ${g.cliente_rif || 'N/A'}</small></p>
+                        <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Cliente:</strong> ${g.cliente_nombre || 'N/A'}<br><small style="color: #666; font-weight: 400;">📄 RIF/C.I: ${g.cliente_rif || 'N/A'}</small></p>
                         <p style="margin-bottom: 12px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Placa:</strong> <span style="font-family: monospace; font-size: 15px; background: #eee; padding: 1px 6px; border-radius: 4px;">${g.vehiculo_placa}</span></p>
                         
                         <div style="margin-top: 15px; padding: 15px; background: #fdfdfd; border-radius: 16px; border: 1px solid #eee; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
@@ -4113,7 +4113,7 @@ function renderDashboardFiscalizador(container) {
                         <span>🔍</span> Filtrar
                     </button>
                     <button class="btn btn-success" onclick="descargarReporteVerificaciones()">
-                        <span>ðŸ“„</span> Descargar PDF
+                        <span>📄</span> Descargar PDF
                     </button>
                 </div>
             </div>
@@ -4318,7 +4318,7 @@ async function onFiscalizadorScanSuccess(decodedText) {
                     <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>N° Guía:</strong> ${g.numero_guia}</p>
                     <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Estado:</strong> <span style="background: ${g.estado === 'activa' ? '#e6f4ea' : '#fce8e6'}; color: ${g.estado === 'activa' ? '#1e8e3e' : '#d93025'}; padding: 2px 8px; border-radius: 20px; font-weight: 800; font-size: 11px;">${g.estado.toUpperCase()}</span></p>
                     <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Empresa:</strong> ${g.empresa_nombre}</p>
-                    <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Cliente:</strong> ${g.cliente_nombre || 'N/A'}<br><small style="color: #666; font-weight: 400;">ðŸ“„ RIF/C.I: ${g.cliente_rif || 'N/A'}</small></p>
+                    <p style="margin-bottom: 8px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Cliente:</strong> ${g.cliente_nombre || 'N/A'}<br><small style="color: #666; font-weight: 400;">📄 RIF/C.I: ${g.cliente_rif || 'N/A'}</small></p>
                     <p style="margin-bottom: 12px; border-bottom: 1px dashed #eee; padding-bottom: 4px;"><strong>Placa:</strong> <span style="font-family: monospace; font-size: 15px; background: #eee; padding: 1px 6px; border-radius: 4px;">${g.vehiculo_placa}</span></p>
                     
                     <div style="margin-top: 15px; padding: 15px; background: #fdfdfd; border-radius: 16px; border: 1px solid #eee; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
