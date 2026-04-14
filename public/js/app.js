@@ -179,7 +179,7 @@ function renderSidebar(role) {
                         <path d="M18 11l4 7h-11l7-7z"/>
                         <path d="M12 22v-4"/>
                     </svg>
-                    <span>GestiÃ³n de Minerales</span>
+                    <span>Gestión de Minerales</span>
                 </a>
             </div>
             
@@ -299,8 +299,8 @@ function updateBreadcrumb(section) {
         'pagos': 'Pagos',
         'deudas': 'Deudas y Recargos',
         'historial': 'Historial',
-        'admin': 'AdministraciÃ³n',
-        'minerales': 'GestiÃ³n de Minerales'
+        'admin': 'Administración',
+        'minerales': 'Gestión de Minerales'
     };
 
     breadcrumb.innerHTML = `
@@ -567,7 +567,7 @@ async function loadMasterDashboard(container) {
         container.innerHTML = `
             <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 30px;">
                 <div>
-                    <h1 class="dashboard-title">Panel de AdministraciÃ³n</h1>
+                    <h1 class="dashboard-title">🏢 Panel de Administración</h1>
                     <p class="dashboard-subtitle">Control de minerales del Estado La Guaira</p>
                     <button class="btn btn-danger btn-sm" onclick="purgarSistema()" style="margin-top: 10px; background: #dc3545; border: none; font-weight: 600; padding: 8px 15px; border-radius: 8px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 10px rgba(220, 53, 69, 0.2);">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
@@ -577,7 +577,7 @@ async function loadMasterDashboard(container) {
                 
                 <div class="card" style="margin: 0; padding: 15px 25px; border-left: 4px solid #6f42c1; display: flex; align-items: center; gap: 20px; background: white; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
                     <div style="display: flex; flex-direction: column;">
-                        <span style="font-size: 14px; font-weight: 700; color: #333;">MÃ³dulo de Pagos y Cobranzas</span>
+                        <span style="font-size: 14px; font-weight: 700; color: #333;">Módulo de Pagos y Cobranzas</span>
                         <div style="display: flex; align-items: center; gap: 6px;">
                             <span style="width: 8px; height: 8px; border-radius: 50%; background: ${systemConfig.modulo_pagos_habilitado === 'true' ? '#27ae60' : '#e74c3c'};"></span>
                             <span style="font-size: 11px; font-weight: 600; color: #666; text-transform: uppercase;">${systemConfig.modulo_pagos_habilitado === 'true' ? 'Activado' : 'Desactivado'}</span>
@@ -594,7 +594,7 @@ async function loadMasterDashboard(container) {
                 <div class="stat-card stat-primary">
                     <div class="stat-header">
                         <h3 class="stat-title">Empresas Activas</h3>
-                        <div class="stat-icon">ðŸ¢</div>
+                        <div class="stat-icon">📊</div>
                     </div>
                     <div class="stat-value">${stats.empresas_activas}</div>
                     <div class="stat-change">Empresas registradas</div>
@@ -604,7 +604,7 @@ async function loadMasterDashboard(container) {
                 <div class="stat-card stat-warning">
                     <div class="stat-header">
                         <h3 class="stat-title">Pagos Pendientes</h3>
-                        <div class="stat-icon">â³</div>
+                        <div class="stat-icon">📊</div>
                     </div>
                     <div class="stat-value">${stats.pagos_pendientes}</div>
                     <div class="stat-change">Pendientes de verificaciÃ³n</div>
@@ -614,7 +614,7 @@ async function loadMasterDashboard(container) {
                 <div class="stat-card stat-info">
                     <div class="stat-header">
                         <h3 class="stat-title">GuÃ­as Este Mes</h3>
-                        <div class="stat-icon">ðŸ“„</div>
+                        <div class="stat-icon">📊</div>
                     </div>
                     <div class="stat-value">${stats.guias_mes}</div>
                     <div class="stat-change">GuÃ­as emitidas</div>
@@ -624,11 +624,11 @@ async function loadMasterDashboard(container) {
                 <div class="stat-card stat-success" id="income-stat-card" onclick="mostrarDetalleIngresos()" style="cursor: pointer; position: relative; transition: all 0.3s ease;">
                     <div class="stat-header">
                         <h3 class="stat-title" id="income-stat-title">Ingresos del Mes</h3>
-                        <div class="stat-icon">ðŸ’°</div>
+                        <div class="stat-icon">📊</div>
                     </div>
                     <div class="stat-value" id="income-stat-value">Bs. ${formatNumber(stats.ingresos_mes)}</div>
                     <div class="stat-change" id="income-stat-footer">Ver desglose detallado</div>
-                    <div style="position: absolute; top: 10px; right: 10px; font-size: 10px; background: rgba(255,255,255,0.5); padding: 2px 6px; border-radius: 10px; color: var(--system-green); font-weight: 700;">ðŸ“Š VER MÃS</div>
+                    <div style="position: absolute; top: 10px; right: 10px; font-size: 10px; background: rgba(255,255,255,0.5); padding: 2px 6px; border-radius: 10px; color: var(--system-green); font-weight: 700;">ðŸ“Š VER MÁS</div>
                 </div>
                 ` : ''}
             </div>
@@ -655,7 +655,7 @@ async function loadMasterDashboard(container) {
             ${systemConfig.modulo_pagos_habilitado === 'true' && pagosPendientes.length > 0 ? `
                 <div class="card" style="background: white; border-radius: 16px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
                     <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 class="card-title" style="font-size: 18px; font-weight: 600;">Pagos Pendientes de VerificaciÃ³n</h2>
+                        <h2 class="card-title" style="font-size: 18px; font-weight: 600;">Pagos Pendientes de Verificación</h2>
                         <span class="badge badge-warning">${pagosPendientes.length} pendiente(s)</span>
                     </div>
                     <div class="table-wrapper">
@@ -702,7 +702,7 @@ async function loadMasterDashboard(container) {
                             <th>NÃºmero</th>
                             <th>Empresa</th>
                             <th>Mineral</th>
-                            <th>ObservaciÃ³n</th>
+                            <th>Observación</th>
                             <th>Estado</th>
                             ${systemConfig.modulo_pagos_habilitado === 'true' ? '<th>Pendiente</th>' : ''}
                             <th>Acciones</th>
@@ -716,7 +716,7 @@ async function loadMasterDashboard(container) {
                                     <td data-label="NÃºmero">${guia.numero_guia}</td>
                                     <td data-label="Empresa">${guia.empresa_nombre}</td>
                                     <td data-label="Mineral">${guia.tipo_mineral}</td>
-                                    <td data-label="ObservaciÃ³n">
+                                    <td data-label="Observación">
                                         <div style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #666;" title="${guia.observaciones || ''}">
                                             ${guia.observaciones || '<span style="color:#ccc;">Sin obs.</span>'}
                                         </div>
@@ -1125,7 +1125,7 @@ async function loadEmpresaDashboard(container) {
                 <div class="stat-card stat-primary">
                     <div class="stat-header">
                         <h3 class="stat-title">GuÃ­as Solicitadas</h3>
-                        <div class="stat-icon">ðŸ“„</div>
+                        <div class="stat-icon">📊</div>
                     </div>
                     <div class="stat-value">${guias.length}</div>
                     <div class="stat-change">Total de solicitudes</div>
@@ -1133,7 +1133,7 @@ async function loadEmpresaDashboard(container) {
                 <div class="stat-card stat-warning">
                     <div class="stat-header">
                         <h3 class="stat-title">Pendientes</h3>
-                        <div class="stat-icon">â³</div>
+                        <div class="stat-icon">📊</div>
                     </div>
                     <div class="stat-value">${guiasPendientes}</div>
                     <div class="stat-change">Por pagar o verificar</div>
@@ -1197,7 +1197,7 @@ async function loadEmpresaDashboard(container) {
                                         `}
 
                                         ${guia.estado === 'pago_pendiente_verificacion' ? `
-                                            <span class="badge badge-info">â³ En VerificaciÃ³n</span>
+                                            <span class="badge badge-info">â³ En Verificación</span>
                                         ` : ''}
                                     </div>
                                 </div>
@@ -1271,7 +1271,7 @@ async function loadGuiasSection(container) {
 
             container.innerHTML = `
                 <div class="dashboard-header">
-                    <h1 class="dashboard-title">ðŸ¢ GestiÃ³n de GuÃ­as</h1>
+                    <h1 class="dashboard-title">ðŸ¢ Gestión de GuÃ­as</h1>
                     <p class="dashboard-subtitle">VisualizaciÃ³n consolidada por empresas</p>
                 </div>
 
@@ -1280,7 +1280,7 @@ async function loadGuiasSection(container) {
                     <div class="stat-card stat-danger">
                         <div class="stat-header">
                             <span class="stat-title">DEUDA TOTAL POR COBRAR</span>
-                            <div class="stat-icon">ðŸ’°</div>
+                            <div class="stat-icon">📊</div>
                         </div>
                         <div class="stat-value">Bs. ${formatNumber(deudaTotalFisica)}</div>
                         <div class="stat-change">Sumatoria de todas las empresas</div>
@@ -1289,7 +1289,7 @@ async function loadGuiasSection(container) {
                     <div class="stat-card stat-primary">
                         <div class="stat-header">
                             <span class="stat-title">EMPRESAS ACTIVAS</span>
-                            <div class="stat-icon">ðŸ­</div>
+                            <div class="stat-icon">📊</div>
                         </div>
                         <div class="stat-value">${Object.keys(empresasMap).length}</div>
                         <div class="stat-change">Con guÃ­as generadas</div>
@@ -1410,7 +1410,7 @@ async function loadGuiasSection(container) {
                                                         `}
 
                                                         ${guia.estado === 'pago_pendiente_verificacion' ? `
-                                                            <span class="badge badge-info">â³ En VerificaciÃ³n</span>
+                                                            <span class="badge badge-info">â³ En Verificación</span>
                                                         ` : ''}
                                                     ` : ''}
                                                 </div>
@@ -1579,7 +1579,7 @@ async function loadDeudasSection(container) {
             </div>
             <div class="card" style="padding: 40px; text-align: center;">
                 <div style="font-size: 48px; margin-bottom: 20px;">ðŸ›¡ï¸</div>
-                <h2>MÃ³dulo Deshabilitado</h2>
+                <h2>Módulo Deshabilitado</h2>
                 <p style="color: #666; margin-top: 10px;">El sistema de pagos y cobranzas ha sido desactivado temporalmente por el administrador.</p>
                 <button class="btn btn-primary mt-3" onclick="navigateToSection('inicio')">Volver al Inicio</button>
             </div>
@@ -3510,7 +3510,7 @@ async function verificarGuiaPublica(guiaId, hash) {
             const statusBg = data.autentica ? 'rgba(40, 167, 69, 0.1)' : 'rgba(220, 53, 69, 0.1)';
 
             Swal.fire({
-                title: 'VerificaciÃ³n de GuÃ­a',
+                title: 'Verificación de GuÃ­a',
                 html: `
                     <div style="text-align: left; font-size: 14px; font-family: 'Inter', system-ui, -apple-system, sans-serif;">
                         <div style="text-align: center; margin-bottom: 20px; padding: 15px; border-radius: 12px; background: ${statusBg}; border: 2.5px solid ${statusColor}; color: ${statusColor}; font-weight: 800; font-size: 16px; letter-spacing: 0.5px;">
@@ -3569,7 +3569,7 @@ function showLoadingScreen(show, text = 'Cargando...') {
 function renderUsuarios(container) {
     container.innerHTML = `
         <div class="content-header">
-            <h2 class="content-title">GestiÃ³n de Usuarios</h2>
+            <h2 class="content-title">Gestión de Usuarios</h2>
         </div>
         
         <div class="stats-grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 2rem;">
@@ -4081,7 +4081,7 @@ function renderDashboardFiscalizador(container) {
         
         <div class="stats-grid" style="grid-template-columns: 1fr;">
             <div class="stat-card">
-                <h3>VerificaciÃ³n RÃ¡pida</h3>
+                <h3>Verificación RÃ¡pida</h3>
                 <p style="color: #666; margin-bottom: 20px;">Use el escÃ¡ner para verificar guÃ­as en puntos de control.</p>
                 <div style="display: flex; flex-direction: column; gap: 15px; align-items: center; padding: 20px; border: 2px dashed #1a5f7a; border-radius: 12px; background: rgba(26, 95, 122, 0.05);">
                     <div style="font-size: 48px;">ðŸ“·</div>
@@ -4309,7 +4309,7 @@ async function onFiscalizadorScanSuccess(decodedText) {
         const statusBg = 'rgba(40, 167, 69, 0.1)';
 
         Swal.fire({
-            title: 'VerificaciÃ³n de GuÃ­a',
+            title: 'Verificación de GuÃ­a',
             html: `
                 <div style="text-align: left; font-size: 14px; font-family: 'Inter', system-ui, -apple-system, sans-serif;">
                     <div style="text-align: center; margin-bottom: 20px; padding: 15px; border-radius: 12px; background: ${statusBg}; border: 2.5px solid ${statusColor}; color: ${statusColor}; font-weight: 800; font-size: 16px; letter-spacing: 0.5px;">
