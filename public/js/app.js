@@ -628,7 +628,7 @@ async function loadMasterDashboard(container) {
                     </div>
                     <div class="stat-value" id="income-stat-value">Bs. ${formatNumber(stats.ingresos_mes)}</div>
                     <div class="stat-change" id="income-stat-footer">Ver desglose detallado</div>
-                    <div style="position: absolute; top: 10px; right: 10px; font-size: 10px; background: rgba(255,255,255,0.5); padding: 2px 6px; border-radius: 10px; color: var(--system-green); font-weight: 700;">�x` VER MÁS</div>
+                    <div style="position: absolute; top: 10px; right: 10px; font-size: 10px; background: rgba(255,255,255,0.5); padding: 2px 6px; border-radius: 10px; color: var(--system-green); font-weight: 700;">VER MÁS</div>
                 </div>
                 ` : ''}
             </div>
@@ -639,7 +639,7 @@ async function loadMasterDashboard(container) {
             <div class="card" style="background: #f0f7ff; border: 1px solid #cce5ff; margin-bottom: 25px;">
                 <div class="card-body" style="display: flex; align-items: center; justify-content: space-between; padding: 15px 20px;">
                     <div style="display: flex; align-items: center; gap: 15px;">
-                        <div style="font-size: 24px;">�x�</div>
+                        <div style="font-size: 24px;">📈</div>
                         <div>
                             <h3 style="margin: 0; font-size: 16px; color: #004085;">Control de Tasa BCV</h3>
                             <p style="margin: 0; font-size: 13px; color: #004085; opacity: 0.8;">Tasa actual en el sistema: <strong id="current-tasa-display">${tasaBCV.toFixed(2)}</strong> Bs/$</p>
@@ -1707,7 +1707,7 @@ async function loadDeudasSection(container) {
             
             <div class="card" style="margin-top: 24px; background: #fffcf0; border: 1px solid #ffeeba;">
                 <div class="card-body" style="display: flex; gap: 16px; align-items: flex-start; padding: 20px;">
-                    <div style="font-size: 24px;">�x</div>
+                    <div style="font-size: 24px;">📈</div>
                     <div>
                         <h4 style="color: #856404; margin-bottom: 4px; font-weight: 700;">Política de Recargos</h4>
                         <p style="font-size: 13px; color: #856404; line-height: 1.5; margin: 0;">
