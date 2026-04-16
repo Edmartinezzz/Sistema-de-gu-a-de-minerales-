@@ -1958,6 +1958,7 @@ function cerrarModalGuia() {
 let tempGuiaData = null;
 
 async function previsualizarGuia() {
+    console.log('--- Iniciando Captura de Datos para Preview ---');
     const form = document.getElementById('guia-form');
     if (!form) {
         alert('Error: No se encontró el formulario');
@@ -1980,31 +1981,50 @@ async function previsualizarGuia() {
 
     const materiales = [];
     for (let i = 0; i < tipos.length; i++) {
-        if (tipos[i].value && cantidades[i].value) {
+        const nombre = tipos[i] ? tipos[i].value : '';
+        const cantidadStr = cantidades[i] ? cantidades[i].value : '0';
+        
+        if (nombre && cantidadStr && parseFloat(cantidadStr) > 0) {
+            const precioUSD = precios[i] ? parseFloat(precios[i].value) || 0 : 0;
+            let precioBS = 0;
+            let precioBSText = "";
+            
+            if (precios_bs[i] && precios_bs[i].value) {
+                precioBSText = precios_bs[i].value.trim();
+                precioBS = parseFloat(precioBSText.replace(/\./g, '').replace(',', '.')) || 0;
+            }
+
             materiales.push({
-                nombre: tipos[i].value,
-                cantidad: parseFloat(cantidades[i].value),
-                unidad: unidades[i].value,
-                precio_unitario: parseFloat(precios[i].value) || 0,
-                precio_unitario_bs: parseFloat(precios_bs[i].value.replace(/\./g, '').replace(',', '.')) || 0,
-                precio_unitario_bs_text: precios_bs[i].value.trim()
+                nombre: nombre,
+                cantidad: parseFloat(cantidadStr),
+                unidad: unidades[i] ? unidades[i].value : 'toneladas',
+                precio_unitario: precioUSD,
+                precio_unitario_bs: precioBS,
+                precio_unitario_bs_text: precioBSText
             });
         }
     }
 
+    console.log('Materiales procesados:', materiales);
+
     if (materiales.length === 0) {
-        alert('Debe agregar al menos un material con su cantidad.');
+        alert('Debe agregar al menos un material con su cantidad mayor a cero.');
         return;
     }
 
     data.materiales = materiales;
-    tempGuiaData = data; // Lo guardamos para la solicitud definitiva
+    tempGuiaData = data;
 
-    // UI Changes para mostrar preview
-    document.getElementById('guia-modal-content').style.maxWidth = '1400px';
-    document.getElementById('guia-preview-container').style.display = 'flex';
-    document.getElementById('modal-footer-normal').style.display = 'none';
-    document.getElementById('modal-footer-preview').style.display = 'flex';
+    // Actualizar UI
+    const modalContent = document.getElementById('guia-modal-content');
+    const previewContainer = document.getElementById('guia-preview-container');
+    const footerNormal = document.getElementById('modal-footer-normal');
+    const footerPreview = document.getElementById('modal-footer-preview');
+
+    if (modalContent) modalContent.style.maxWidth = '1400px';
+    if (previewContainer) previewContainer.style.display = 'flex';
+    if (footerNormal) footerNormal.style.display = 'none';
+    if (footerPreview) footerPreview.style.display = 'flex';
     
     // Bloquear formulario
     Array.from(form.elements).forEach(el => el.disabled = true);
@@ -2012,10 +2032,11 @@ async function previsualizarGuia() {
     const iframe = document.getElementById('pdf-preview-iframe');
     const loading = document.getElementById('preview-loading');
     
-    iframe.style.display = 'none';
-    loading.style.display = 'block';
+    if (iframe) iframe.style.display = 'none';
+    if (loading) loading.style.display = 'block';
 
     try {
+        console.log('Enviando solicitud de preview a:', `${API_BASE}/guias/previsualizar`);
         const response = await fetch(`${API_BASE}/guias/previsualizar`, {
             method: 'POST',
             headers: {
@@ -2027,21 +2048,29 @@ async function previsualizarGuia() {
 
         if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.error || 'Error al generar la vista previa');
+            throw new Error(errData.error || `Error del servidor: ${response.status}`);
         }
 
         const blob = await response.blob();
+        if (blob.type !== 'application/pdf') {
+            throw new Error('El servidor no devolvió un PDF válido.');
+        }
+
         const objectUrl = URL.createObjectURL(blob);
         
-        iframe.src = objectUrl;
-        loading.style.display = 'none';
-        iframe.style.display = 'block';
+        if (iframe) {
+            iframe.src = objectUrl;
+            loading.style.display = 'none';
+            iframe.style.display = 'block';
+        }
 
     } catch (error) {
+        console.error('Error detallado en preview:', error);
         alert('Error en previsualización: ' + error.message);
         cancelarPrevisualizacion();
     }
 }
+
 
 function cancelarPrevisualizacion() {
     document.getElementById('guia-modal-content').style.maxWidth = '900px';

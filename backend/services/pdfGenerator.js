@@ -251,12 +251,13 @@ async function generateGuiaPDF(guiaData) {
                 const cantidad = item.cantidad;
                 const unidad = item.unidad;
                 
-                const tasaBcv = parseFloat(guiaData.tasa_bcv || 1);
+                const tasaBcv = parseFloat(guiaData.tasa_bcv) || 1;
                 
                 // El Total Bs debe calcularse matemáticamente desde el USD: (Cantidad * Precio USD) * Tasa BCV
                 const precioParsedUSD = parseFloat(item.precio_unitario);
                 const precioUnidadUSD = isNaN(precioParsedUSD) ? 0 : precioParsedUSD;
-                const totalUSD = cantidad * precioUnidadUSD;
+                const cantMaterial = parseFloat(item.cantidad) || 0;
+                const totalUSD = cantMaterial * precioUnidadUSD;
                 const totalItemBS = totalUSD * tasaBcv;
 
                 // Para la columna visual de Precio Unitario Bs, usamos el valor ingresado o calculamos el fallback
@@ -283,7 +284,7 @@ async function generateGuiaPDF(guiaData) {
                         doc.text(precioUnidadBS.toLocaleString('es-VE', { minimumFractionDigits: 2 }), materialX + 163, mY + 2, { width: 54, align: 'center' });
                     }
                     
-                    doc.text(totalItemBS.toLocaleString('es-VE', { minimumFractionDigits: 2 }), materialX + 223, mY + 2, { width: 49, align: 'center' });
+                    doc.text((totalItemBS || 0).toLocaleString('es-VE', { minimumFractionDigits: 2 }), materialX + 223, mY + 2, { width: 49, align: 'center' });
                 }
 
                 mY += rowHeight;
@@ -291,14 +292,14 @@ async function generateGuiaPDF(guiaData) {
 
             // Fila TOTALES (Simplificada: Solo mostrar el monto final que es el 100% del valor)
             const rowHeightTotal = 13;
-            const montoPagarBS = parseFloat(guiaData.monto_pagar || 0);
-            const montoRecargoBS = parseFloat(guiaData.monto_recargo || 0);
+            const montoPagarBS = parseFloat(guiaData.monto_pagar) || 0;
+            const montoRecargoBS = parseFloat(guiaData.monto_recargo) || 0;
             const totalFinalBS = montoPagarBS + montoRecargoBS;
-            const tasa_bcv = parseFloat(guiaData.tasa_bcv || 1);
+            const tasa_bcv = parseFloat(guiaData.tasa_bcv) || 1;
 
             // Lógica para detectar si monto_usd es el total (100%) o solo el impuesto (2.5% legacy)
-            let totalUSD = parseFloat(guiaData.monto_usd || 0);
-            const montoPagarUsdEquiv = montoPagarBS / tasa_bcv;
+            let totalUSD = parseFloat(guiaData.monto_usd) || 0;
+            const montoPagarUsdEquiv = tasa_bcv > 0 ? montoPagarBS / tasa_bcv : 0;
 
             // Si el monto en USD guardado es muy pequeño comparado con el monto en Bolívares al cambio,
             // es porque era una guía vieja que solo guardaba el 2.5% en 'monto_usd'.
@@ -314,7 +315,7 @@ async function generateGuiaPDF(guiaData) {
             doc.rect(materialX + 140, mY, 60, rowHeightTotal).stroke('#000');
             doc.rect(materialX + 200, mY, 75, rowHeightTotal).stroke('#000');
             doc.fontSize(9).font('Helvetica-Bold').fillColor('#FFFFFF').text('TOTAL A PAGAR', materialX + 5, mY + 3);
-            doc.fillColor('#000000').text(`Bs. ${totalFinalBS.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, materialX + 200, mY + 3, { width: 75, align: 'center' });
+            doc.fillColor('#000000').text(`Bs. ${(totalFinalBS || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, materialX + 200, mY + 3, { width: 75, align: 'center' });
             mY += rowHeightTotal;
 
             if (montoRecargoBS > 0) {

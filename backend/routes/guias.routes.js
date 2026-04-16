@@ -239,8 +239,9 @@ router.post('/solicitar', authenticateToken, requireRole(['empresa', 'contribuye
  * POST /api/guias/previsualizar
  * Permite previsualizar el PDF de la guía antes de confirmar su solicitud e inserción
  */
-router.post('/previsualizar', authenticateToken, requireRole(['empresa', 'contribuyente']), async (req, res) => {
+router.post('/previsualizar', authenticateToken, requireRole(['empresa', 'contribuyente', 'master']), async (req, res) => {
     try {
+        console.log('--- INICIO PREVISUALIZACIÓN ---');
         const {
             materiales, origen, destino, vehiculo_placa, vehiculo_marca, vehiculo_modelo,
             vehiculo_color, vehiculo_carroceria, conductor_nombre, conductor_cedula,
@@ -257,8 +258,10 @@ router.post('/previsualizar', authenticateToken, requireRole(['empresa', 'contri
 
         if (!materiales || !Array.isArray(materiales) || materiales.length === 0 ||
             !origen || !destino || !vehiculo_placa || !conductor_nombre || !conductor_cedula) {
-            return res.status(400).json({ error: 'Datos incompletos para previsualización.' });
+            console.error('Datos incompletos para preview:', { materiales: !!materiales, origen, destino, vehiculo_placa });
+            return res.status(400).json({ error: 'Datos incompletos para previsualización (Origen, Destino, Placa y Conductor son obligatorios).' });
         }
+
 
         let total_venta_usd = 0;
         materiales.forEach(m => {
