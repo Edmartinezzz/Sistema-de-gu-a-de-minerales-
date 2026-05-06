@@ -89,4 +89,17 @@ router.put('/perfil', authenticateToken, requireRole(['empresa', 'contribuyente'
     }
 });
 
+// GET /api/empresas - Listar todas las empresas (Solo Master)
+router.get('/', authenticateToken, requireRole(['master']), async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT id, rif, razon_social, activo FROM empresas ORDER BY razon_social ASC'
+        );
+        res.json({ success: true, empresas: result.rows });
+    } catch (error) {
+        console.error('Error listando empresas:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
+    }
+});
+
 module.exports = router;

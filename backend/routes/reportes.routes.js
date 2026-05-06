@@ -2,9 +2,70 @@ const express = require('express');
 const db = require('../config/database');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { formatNumeroGuia } = require('../utils/security');
-const { generateVerificacionesPDF } = require('../services/reportGenerator');
+const { generateVerificacionesPDF, generateGuiasAgrupadasPDF, generateGuiasDetalladasPDF } = require('../services/reportGenerator');
 
 const router = express.Router();
+
+/**
+ * GET /api/reportes/guias-detalladas-pdf
+ * Generar reporte PDF detallado de cada guía
+ */
+router.get('/guias-detalladas-pdf', authenticateToken, requireRole(['master']), async (req, res) => {
+    try {
+        const { desde, hasta, empresa_id } = req.query;
+
+        let query = `
+            SELECT g.*, e.razon_social as empresa_nombre, e.codigo_letra
+            FROM guias_movilizacion g
+            JOIN empresas e ON g.empresa_id = e.id
+            WHERE 1=1
+        `;
+        const params = [];
+        let paramCount = 1;
+
+        if (empresa_id) {
+            query += ` AND g.empresa_id = $${paramCount}`;
+            params.push(empresa_id);
+            paramCount++;
+        }
+
+        if (desde && desde !== 'null') {
+            query += ` AND g.created_at >= $${paramCount}`;
+            params.push(desde);
+            paramCount++;
+        }
+
+        if (hasta && hasta !== 'null') {
+            query += ` AND g.created_at <= $${paramCount}::timestamp + interval '1 day' - interval '1 second'`;
+            params.push(hasta);
+            paramCount++;
+        }
+
+        query += ` ORDER BY g.created_at ASC`;
+
+        const result = await db.query(query, params);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'No se encontraron guías en el rango especificado.' });
+        }
+
+        const period = { desde, hasta };
+        const pdfBuffer = await generateGuiasDetalladasPDF(result.rows, period, req.user);
+
+        res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': 'attachment; filename=reporte-guias-detallado.pdf',
+            'Content-Length': pdfBuffer.length
+        });
+
+        res.send(pdfBuffer);
+
+    } catch (error) {
+        console.error('Error al generar PDF de guías detallado:', error);
+        res.status(500).json({ error: 'Error al generar el PDF.' });
+    }
+});
+
 
 /**
  * GET /api/reportes/estadisticas
@@ -317,6 +378,98 @@ router.get('/verificaciones-pdf', authenticateToken, requireRole(['fiscalizador'
 
     } catch (error) {
         console.error('Error al generar PDF de verificaciones:', error);
+        res.status(500).json({ error: 'Error al generar el PDF.' });
+    }
+});
+
+/**
+ * GET /api/reportes/guias-agrupadas-pdf
+ * Generar reporte PDF de guías consolidadas por empresa
+ */
+router.get('/guias-agrupadas-pdf', authenticateToken, requireRole(['master']), async (req, res) => {
+    try {
+        const { desde, hasta, empresa_id } = req.query;
+
+        // Obtenemos todas las guías individuales para poder procesar el JSON de materiales si es necesario
+        let query = `
+            SELECT g.*, e.razon_social as empresa_nombre, e.rif as empresa_rif
+            FROM guias_movilizacion g
+            JOIN empresas e ON g.empresa_id = e.id
+            WHERE 1=1
+        `;
+        const params = [];
+        let paramCount = 1;
+
+        if (empresa_id) {
+            query += ` AND g.empresa_id = $${paramCount}`;
+            params.push(empresa_id);
+            paramCount++;
+        }
+
+        if (desde && desde !== 'null') {
+            query += ` AND g.created_at >= $${paramCount}`;
+            params.push(desde);
+            paramCount++;
+        }
+
+        if (hasta && hasta !== 'null') {
+            query += ` AND g.created_at <= $${paramCount}::timestamp + interval '1 day' - interval '1 second'`;
+            params.push(hasta);
+            paramCount++;
+        }
+
+        const result = await db.query(query, params);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'No se encontraron guías en el rango especificado.' });
+        }
+
+        // Agrupar por empresa en JS para manejar la lógica de materiales
+        const empresasMap = {};
+
+        result.rows.forEach(g => {
+            if (!empresasMap[g.empresa_id]) {
+                empresasMap[g.empresa_id] = {
+                    empresa_nombre: g.empresa_nombre,
+                    cantidad_guias: 0,
+                    total_bs: 0
+                };
+            }
+
+            let totalGuia = parseFloat(g.monto_pagar || 0) + parseFloat(g.monto_recargo || 0);
+            
+            // Si es 0, calculamos desde materiales
+            if (totalGuia === 0 && g.materiales) {
+                let mats = g.materiales;
+                if (typeof mats === 'string') {
+                    try { mats = JSON.parse(mats); } catch(e) { mats = []; }
+                }
+                if (Array.isArray(mats)) {
+                    mats.forEach(m => {
+                        totalGuia += (parseFloat(m.cantidad || 0) * parseFloat(m.precio_unitario_bs || 0));
+                    });
+                }
+            }
+
+            empresasMap[g.empresa_id].cantidad_guias += 1;
+            empresasMap[g.empresa_id].total_bs += totalGuia;
+        });
+
+        const datos = Object.values(empresasMap);
+
+        const period = { desde, hasta };
+        const pdfBuffer = await generateGuiasAgrupadasPDF(datos, period, req.user);
+
+        res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': 'attachment; filename=reporte-guias-agrupadas.pdf',
+            'Content-Length': pdfBuffer.length
+        });
+
+        res.send(pdfBuffer);
+
+    } catch (error) {
+        console.error('Error al generar PDF de guías agrupadas:', error);
         res.status(500).json({ error: 'Error al generar el PDF.' });
     }
 });

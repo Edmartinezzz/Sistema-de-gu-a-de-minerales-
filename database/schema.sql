@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS empresas (
     email VARCHAR(100),
     representante_legal VARCHAR(255),
     logo_url TEXT, -- Agregado para Supabase Storage
+    codigo_letra VARCHAR(10) DEFAULT '', -- Prefijo para guías
     activo BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

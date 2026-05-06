@@ -345,7 +345,7 @@ router.post('/previsualizar', authenticateToken, requireRole(['empresa', 'contri
  */
 router.get('/', authenticateToken, async (req, res) => {
     try {
-        const { estado, desde, hasta, limit = 100 } = req.query;
+        const { estado, desde, hasta, empresa_id, limit = 500 } = req.query;
 
         let query = `
             SELECT g.*, e.razon_social as empresa_nombre, e.rif as empresa_rif, e.codigo_letra
@@ -360,6 +360,11 @@ router.get('/', authenticateToken, async (req, res) => {
         if (req.user.role !== 'master') {
             query += ` AND g.empresa_id = $${paramCount}`;
             params.push(req.user.empresaId);
+            paramCount++;
+        } else if (empresa_id) {
+            // Si es master y se proporcionó empresa_id, filtrar por ella
+            query += ` AND g.empresa_id = $${paramCount}`;
+            params.push(empresa_id);
             paramCount++;
         }
 

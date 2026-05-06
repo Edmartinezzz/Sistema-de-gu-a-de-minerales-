@@ -1237,13 +1237,30 @@ async function loadEmpresaDashboard(container) {
 }
 
 // ===== SECCIONES ADICIONALES =====
-async function loadGuiasSection(container) {
+async function loadGuiasSection(container, desde = '', hasta = '', empresa_id = '') {
     showLoading(true);
     try {
-        const guiasResponse = await apiRequest('/guias');
+        let endpoint = '/guias';
+        const params = new URLSearchParams();
+        if (desde) params.append('desde', desde);
+        if (hasta) params.append('hasta', hasta);
+        if (empresa_id) params.append('empresa_id', empresa_id);
+        
+        // Aumentamos el límite para ver todas las guías (ej. 1000)
+        params.append('limit', '1000');
+
+        if (params.toString()) {
+            endpoint += `?${params.toString()}`;
+        }
+        
+        const guiasResponse = await apiRequest(endpoint);
         const guias = guiasResponse.guias;
 
         if (currentUser.role === 'master') {
+            // Obtener lista de empresas para el filtro
+            const empresasResponse = await apiRequest('/empresas');
+            const listaEmpresas = empresasResponse.empresas || [];
+
             // VISTA ADMINISTRADOR (Agrupada por Empresa)
             const empresasMap = {};
             let deudaTotalFisica = 0;
@@ -1270,9 +1287,37 @@ async function loadGuiasSection(container) {
             });
 
             container.innerHTML = `
-                <div class="dashboard-header">
-                    <h1 class="dashboard-title">ðŸ¢ Gestión de Guías</h1>
-                    <p class="dashboard-subtitle">Visualización consolidada por empresas</p>
+                <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 15px;">
+                    <div>
+                        <h1 class="dashboard-title">🏢 Gestión de Guías</h1>
+                        <p class="dashboard-subtitle">Visualización consolidada por empresas</p>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: flex-end; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); flex-wrap: wrap;">
+                        <div>
+                            <label style="font-size: 12px; font-weight: 600; color: #666; display: block; margin-bottom: 4px;">Empresa:</label>
+                            <select id="filtro-empresa" class="form-control" style="padding: 6px 10px; font-size: 14px; min-width: 200px;">
+                                <option value="">Todas las empresas</option>
+                                ${listaEmpresas.map(e => `<option value="${e.id}" ${empresa_id === e.id ? 'selected' : ''}>${e.razon_social}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 12px; font-weight: 600; color: #666; display: block; margin-bottom: 4px;">Desde:</label>
+                            <input type="date" id="filtro-desde" class="form-control" style="padding: 6px 10px; font-size: 14px;" value="${desde}">
+                        </div>
+                        <div>
+                            <label style="font-size: 12px; font-weight: 600; color: #666; display: block; margin-bottom: 4px;">Hasta:</label>
+                            <input type="date" id="filtro-hasta" class="form-control" style="padding: 6px 10px; font-size: 14px;" value="${hasta}">
+                        </div>
+                        <button class="btn btn-primary" onclick="filtrarGuiasAdmin()" style="padding: 6px 15px;">Filtrar</button>
+                        <button class="btn btn-secondary" onclick="descargarReporteGuiasAdmin()" style="padding: 6px 15px; background: #6c757d; border-color: #6c757d; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            Consolidado
+                        </button>
+                        <button class="btn btn-secondary" onclick="descargarReporteDetalladoAdmin()" style="padding: 6px 15px; background: #1a5f7a; border-color: #1a5f7a; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            Detallado
+                        </button>
+                    </div>
                 </div>
 
                 <div class="stats-grid">
@@ -1470,6 +1515,100 @@ async function loadGuiasSection(container) {
         showLoading(false);
     }
 }
+
+window.filtrarGuiasAdmin = function() {
+    const empresa_id = document.getElementById('filtro-empresa').value;
+    const desde = document.getElementById('filtro-desde').value;
+    const hasta = document.getElementById('filtro-hasta').value;
+    const container = document.getElementById('dashboard-content');
+    loadGuiasSection(container, desde, hasta, empresa_id);
+};
+
+window.descargarReporteGuiasAdmin = function() {
+    const empresa_id = document.getElementById('filtro-empresa').value;
+    const desde = document.getElementById('filtro-desde').value;
+    const hasta = document.getElementById('filtro-hasta').value;
+    
+    let url = `${API_BASE}/reportes/guias-agrupadas-pdf`;
+    const params = new URLSearchParams();
+    if (empresa_id) params.append('empresa_id', empresa_id);
+    if (desde) params.append('desde', desde);
+    if (hasta) params.append('hasta', hasta);
+    
+    if (params.toString()) {
+        url += `?${params.toString()}`;
+    }
+    
+    showLoading(true);
+    fetch(url, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Error al generar el reporte');
+        return response.blob();
+    })
+    .then(blob => {
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = downloadUrl;
+        a.download = `Reporte_Guias_Consolidado_${new Date().getTime()}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(downloadUrl);
+        a.remove();
+    })
+    .catch(error => {
+        console.error(error);
+        alert('Hubo un error al generar el reporte');
+    })
+    .finally(() => {
+        showLoading(false);
+    });
+};
+
+window.descargarReporteDetalladoAdmin = function() {
+    const empresa_id = document.getElementById('filtro-empresa').value;
+    const desde = document.getElementById('filtro-desde').value;
+    const hasta = document.getElementById('filtro-hasta').value;
+    
+    let url = `${API_BASE}/reportes/guias-detalladas-pdf`;
+    const params = new URLSearchParams();
+    if (empresa_id) params.append('empresa_id', empresa_id);
+    if (desde) params.append('desde', desde);
+    if (hasta) params.append('hasta', hasta);
+    
+    if (params.toString()) {
+        url += `?${params.toString()}`;
+    }
+    
+    showLoading(true);
+    fetch(url, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Error al generar el reporte');
+        return response.blob();
+    })
+    .then(blob => {
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = downloadUrl;
+        a.download = `Reporte_Guias_Detallado_${new Date().getTime()}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(downloadUrl);
+        a.remove();
+    })
+    .catch(error => {
+        console.error(error);
+        alert('Hubo un error al generar el reporte detallado');
+    })
+    .finally(() => {
+        showLoading(false);
+    });
+};
 
 async function loadPagosSection(container) {
     showLoading(true);
