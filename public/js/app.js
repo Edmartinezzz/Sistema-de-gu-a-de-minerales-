@@ -1311,11 +1311,19 @@ async function loadGuiasSection(container, desde = '', hasta = '', empresa_id = 
                         <button class="btn btn-primary" onclick="filtrarGuiasAdmin()" style="padding: 6px 15px;">Filtrar</button>
                         <button class="btn btn-secondary" onclick="descargarReporteGuiasAdmin()" style="padding: 6px 15px; background: #6c757d; border-color: #6c757d; display: flex; align-items: center; gap: 6px;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                            Consolidado
+                            Consolidado (PDF)
+                        </button>
+                        <button class="btn btn-secondary" onclick="descargarReporteGuiasAdminExcel()" style="padding: 6px 15px; background: #28a745; border-color: #28a745; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            Consolidado (Excel)
                         </button>
                         <button class="btn btn-secondary" onclick="descargarReporteDetalladoAdmin()" style="padding: 6px 15px; background: #1a5f7a; border-color: #1a5f7a; display: flex; align-items: center; gap: 6px;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                            Detallado
+                            Detallado (PDF)
+                        </button>
+                        <button class="btn btn-secondary" onclick="descargarReporteDetalladoAdminExcel()" style="padding: 6px 15px; background: #007aff; border-color: #007aff; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            Detallado (Excel)
                         </button>
                     </div>
                 </div>
@@ -1604,6 +1612,92 @@ window.descargarReporteDetalladoAdmin = function() {
     .catch(error => {
         console.error(error);
         alert('Hubo un error al generar el reporte detallado');
+    })
+    .finally(() => {
+        showLoading(false);
+    });
+};
+
+window.descargarReporteGuiasAdminExcel = function() {
+    const empresa_id = document.getElementById('filtro-empresa').value;
+    const desde = document.getElementById('filtro-desde').value;
+    const hasta = document.getElementById('filtro-hasta').value;
+    
+    let url = `${API_BASE}/reportes/guias-agrupadas-excel`;
+    const params = new URLSearchParams();
+    if (empresa_id) params.append('empresa_id', empresa_id);
+    if (desde) params.append('desde', desde);
+    if (hasta) params.append('hasta', hasta);
+    
+    if (params.toString()) {
+        url += `?${params.toString()}`;
+    }
+    
+    showLoading(true);
+    fetch(url, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Error al generar el reporte Excel');
+        return response.blob();
+    })
+    .then(blob => {
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = downloadUrl;
+        a.download = `Reporte_Guias_Consolidado_${new Date().getTime()}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(downloadUrl);
+        a.remove();
+    })
+    .catch(error => {
+        console.error(error);
+        alert('Hubo un error al generar el reporte Excel');
+    })
+    .finally(() => {
+        showLoading(false);
+    });
+};
+
+window.descargarReporteDetalladoAdminExcel = function() {
+    const empresa_id = document.getElementById('filtro-empresa').value;
+    const desde = document.getElementById('filtro-desde').value;
+    const hasta = document.getElementById('filtro-hasta').value;
+    
+    let url = `${API_BASE}/reportes/guias-detalladas-excel`;
+    const params = new URLSearchParams();
+    if (empresa_id) params.append('empresa_id', empresa_id);
+    if (desde) params.append('desde', desde);
+    if (hasta) params.append('hasta', hasta);
+    
+    if (params.toString()) {
+        url += `?${params.toString()}`;
+    }
+    
+    showLoading(true);
+    fetch(url, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Error al generar el reporte detallado Excel');
+        return response.blob();
+    })
+    .then(blob => {
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = downloadUrl;
+        a.download = `Reporte_Guias_Detallado_${new Date().getTime()}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(downloadUrl);
+        a.remove();
+    })
+    .catch(error => {
+        console.error(error);
+        alert('Hubo un error al generar el reporte detallado Excel');
     })
     .finally(() => {
         showLoading(false);
@@ -4281,7 +4375,10 @@ function renderDashboardFiscalizador(container) {
                         <span>🔍</span> Filtrar
                     </button>
                     <button class="btn btn-success" onclick="descargarReporteVerificaciones()">
-                        <span>📄</span> Descargar PDF
+                        <span>📄</span> PDF
+                    </button>
+                    <button class="btn btn-primary" onclick="descargarReporteVerificacionesExcel()" style="background: #28a745; border-color: #28a745;">
+                        <span>📊</span> Excel
                     </button>
                 </div>
             </div>
@@ -4624,6 +4721,55 @@ async function descargarReporteVerificaciones() {
 
     } catch (error) {
         console.error('Error descarga PDF:', error);
+        Swal.fire('Error', error.message, 'error');
+    }
+}
+
+async function descargarReporteVerificacionesExcel() {
+    const start = document.getElementById('historial-start-date')?.value;
+    const end = document.getElementById('historial-end-date')?.value;
+
+    if (!start || !end) {
+        return Swal.fire('Atención', 'Seleccione un rango de fechas (Desde/Hasta) para generar el Excel.', 'info');
+    }
+
+    // Si estamos en entorno Capacitor/Móvil, usamos el navegador del sistema para las descargas
+    if (window.Capacitor && window.Capacitor.getPlatform() !== 'web') {
+        const downloadUrl = `${API_BASE}/reportes/verificaciones-excel?startDate=${start}&endDate=${end}&token=${authToken}`;
+        window.open(downloadUrl, '_system');
+        return;
+    }
+
+    try {
+        Swal.fire({
+            title: 'Generando Excel...',
+            text: 'Espere un momento por favor.',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
+
+        const response = await fetch(`${API_BASE}/reportes/verificaciones-excel?startDate=${start}&endDate=${end}`, {
+            headers: { 'Authorization': 'Bearer ' + authToken }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al descargar el Excel.');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `reporte-verificaciones-${new Date().getTime()}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        
+        Swal.close();
+
+    } catch (error) {
+        console.error('Error descarga Excel:', error);
         Swal.fire('Error', error.message, 'error');
     }
 }
