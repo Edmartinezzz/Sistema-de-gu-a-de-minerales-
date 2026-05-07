@@ -226,8 +226,8 @@ async function generateGuiasDetalladasPDF(guias, period, adminUser) {
 
             // Tabla Headers
             const tableTop = 110;
-            const colWidths = [80, 180, 90, 160, 90, 112];
-            const colNames = ['Fecha', 'Empresa', 'N° Guía', 'Mineral / Material', 'Cantidad', 'Total Bs.'];
+            const colWidths = [60, 100, 140, 60, 120, 70, 162];
+            const colNames = ['Fecha', 'Empresa', 'Cliente', 'N° Guía', 'Mineral / Material', 'Cant.', 'Total Bs.'];
             
             doc.rect(40, tableTop - 5, 712, 25).fill(primaryColor);
             doc.fillColor('white');
@@ -235,16 +235,18 @@ async function generateGuiasDetalladasPDF(guias, period, adminUser) {
             let x = 45;
             doc.fontSize(10).font('Helvetica-Bold');
             colNames.forEach((name, i) => {
-                doc.text(name, x, tableTop, { width: colWidths[i] - 10, align: i === 5 ? 'right' : 'left' });
+                doc.text(name, x, tableTop, { width: colWidths[i] - 5, align: i === 6 ? 'right' : 'left' });
                 x += colWidths[i];
             });
             
             // Tabla Filas
             let y = tableTop + 30;
-            doc.fontSize(9).font('Helvetica').fillColor(textColor);
+            doc.fontSize(8).font('Helvetica').fillColor(textColor);
 
             let totalBsGlobal = 0;
             let totalGuias = 0;
+            let totalCantidadGlobal = 0;
+            const totalesPorMaterial = {}; // { 'Piedra': { cant: 10, unidad: 'm3' } }
 
             guias.forEach((g, index) => {
                 // Calcular total desde materiales si monto_pagar es 0
@@ -268,7 +270,15 @@ async function generateGuiasDetalladasPDF(guias, period, adminUser) {
                 totalBsGlobal += totalGuia;
                 totalGuias++;
 
-                if (y > 520) {
+                // Acumular por material para el resumen final
+                const materialKey = g.tipo_mineral || 'N/A';
+                if (!totalesPorMaterial[materialKey]) {
+                    totalesPorMaterial[materialKey] = { cantidad: 0, unidad: g.unidad || 'N/A' };
+                }
+                totalesPorMaterial[materialKey].cantidad += parseFloat(g.cantidad || 0);
+                totalCantidadGlobal += parseFloat(g.cantidad || 0);
+
+                if (y > 500) {
                     doc.addPage();
                     // Re-dibujar header de página
                     doc.rect(0, 0, 792, 40).fill(primaryColor);
@@ -280,38 +290,40 @@ async function generateGuiasDetalladasPDF(guias, period, adminUser) {
                     x = 45;
                     doc.fontSize(10).font('Helvetica-Bold');
                     colNames.forEach((name, i) => {
-                        doc.text(name, x, y, { width: colWidths[i] - 10, align: i === 5 ? 'right' : 'left' });
+                        doc.text(name, x, y, { width: colWidths[i] - 5, align: i === 6 ? 'right' : 'left' });
                         x += colWidths[i];
                     });
                     y += 30;
-                    doc.fontSize(9).font('Helvetica').fillColor(textColor);
+                    doc.fontSize(8).font('Helvetica').fillColor(textColor);
                 }
 
                 // Fondo alternado para filas
                 if (index % 2 === 0) {
-                    doc.rect(40, y - 5, 712, 20).fill(secondaryColor);
+                    doc.rect(40, y - 5, 712, 25).fill(secondaryColor);
                 }
                 doc.fillColor(textColor);
                 
                 // Bordes suaves
-                doc.rect(40, y - 5, 712, 20).stroke('#e5e7eb');
+                doc.rect(40, y - 5, 712, 25).stroke('#e5e7eb');
 
                 x = 45;
                 doc.text(new Date(g.created_at).toLocaleDateString('es-VE'), x, y);
                 x += colWidths[0];
-                doc.text(g.empresa_nombre || 'N/A', x, y, { width: colWidths[1] - 10 });
+                doc.text(g.empresa_nombre || 'N/A', x, y, { width: colWidths[1] - 5 });
                 x += colWidths[1];
-                doc.text(formatNumeroGuia(g.numero_guia, g.codigo_letra), x, y);
+                doc.text(g.cliente_nombre || 'N/A', x, y, { width: colWidths[2] - 5 });
                 x += colWidths[2];
-                doc.text(g.tipo_mineral || 'N/A', x, y, { width: colWidths[3] - 10 });
+                doc.text(formatNumeroGuia(g.numero_guia, g.codigo_letra), x, y);
                 x += colWidths[3];
-                doc.text(`${g.cantidad} ${g.unidad}`, x, y);
+                doc.text(g.tipo_mineral || 'N/A', x, y, { width: colWidths[4] - 5 });
                 x += colWidths[4];
+                doc.text(`${g.cantidad} ${g.unidad}`, x, y, { width: colWidths[5] - 5 });
+                x += colWidths[5];
                 
                 const bsFormatted = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalGuia);
-                doc.text(bsFormatted, x, y, { width: colWidths[5] - 10, align: 'right' });
+                doc.text(bsFormatted, x, y, { width: colWidths[6] - 5, align: 'right' });
 
-                y += 20;
+                y += 25;
             });
 
             // Resumen Final
@@ -322,6 +334,30 @@ async function generateGuiasDetalladasPDF(guias, period, adminUser) {
                 y += 20;
             }
 
+            // Nueva sección: Totales por Material
+            doc.rect(40, y, 240, 80).fill('#f8fafc').stroke(primaryColor);
+            doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold');
+            doc.text('TOTALES POR MATERIAL', 50, y + 10);
+            doc.fillColor(textColor).fontSize(9).font('Helvetica');
+            
+            let matY = y + 30;
+            Object.keys(totalesPorMaterial).forEach(mat => {
+                if (matY < y + 70) {
+                    const cantFormateada = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2 }).format(totalesPorMaterial[mat].cantidad);
+                    doc.text(`${mat}:`, 50, matY, { width: 150 });
+                    doc.text(`${cantFormateada} ${totalesPorMaterial[mat].unidad}`, 50, matY, { width: 220, align: 'right' });
+                    matY += 12;
+                }
+            });
+
+            // Fila de Total de Cantidades
+            doc.moveTo(50, matY).lineTo(270, matY).stroke(primaryColor);
+            matY += 5;
+            doc.font('Helvetica-Bold').text('TOTAL CANTIDAD:', 50, matY, { width: 150 });
+            const totalCantFormateada = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2 }).format(totalCantidadGlobal);
+            doc.text(`${totalCantFormateada} m³`, 50, matY, { width: 220, align: 'right' });
+
+            // Resumen Financiero
             doc.rect(500, y, 252, 80).fill('#f8fafc').stroke(primaryColor);
             doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold');
             doc.text('RESUMEN DE REPORTE', 510, y + 10);
