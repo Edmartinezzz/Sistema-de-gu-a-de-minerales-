@@ -1392,10 +1392,17 @@ async function loadGuiasSection(container, desde = '', hasta = '', empresa_id = 
                                                 ` : ''}
                                             </div>
                                         </div>
-                                        <div style="display: flex; gap: 6px;">
-                                            <button class="btn btn-outline btn-sm" onclick="descargarGuia('${guia.id}')" style="flex: 1; padding: 4px;">PDF</button>
+                                        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                            <button class="btn btn-outline btn-sm" onclick="descargarGuia('${guia.id}')" style="flex: 1; min-width: 45px; padding: 4px;">PDF</button>
+                                            ${currentUser.role === 'master' ? `
+                                                <button class="btn btn-danger btn-sm" onclick="eliminarGuia('${guia.id}', '${guia.numero_guia}')" style="flex: 1; min-width: 60px; padding: 4px; background: #CF142B; border-color: #CF142B; color: white;">Eliminar</button>
+                                                ${guia.estado === 'activa' ? `
+                                                    <button class="btn btn-warning btn-sm" onclick="anularGuia('${guia.id}')" style="flex: 1; min-width: 55px; padding: 4px; background: #FF9500; border-color: #FF9500; color: white;">Anular</button>
+                                                    <button class="btn btn-success btn-sm" onclick="marcarUsada('${guia.id}')" style="flex: 1; min-width: 55px; padding: 4px; background: #34C759; border-color: #34C759; color: white;">Usada</button>
+                                                ` : ''}
+                                            ` : ''}
                                             ${guia.estado === 'pago_pendiente_verificacion' ? `
-                                                <button class="btn btn-primary btn-sm" onclick="navigateToSection('pagos')" style="flex: 1; padding: 4px; background: #FF9500;">Ver Pago</button>
+                                                <button class="btn btn-primary btn-sm" onclick="navigateToSection('pagos')" style="flex: 1; padding: 4px; background: #007AFF;">Ver Pago</button>
                                             ` : ''}
                                         </div>
                                     </div>
