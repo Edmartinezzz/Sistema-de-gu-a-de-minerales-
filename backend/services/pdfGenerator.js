@@ -93,6 +93,16 @@ async function generateGuiaPDF(guiaData) {
                 align: 'right'
             });
 
+            // Hora de generación (Justo debajo del número de guía)
+            if (guiaData.fecha_emision) {
+                doc.fontSize(10).font('Helvetica-Bold').fillColor('#000000');
+                const horaGeneracion = formatTime(guiaData.fecha_emision);
+                doc.text(`Hora: ${horaGeneracion}`, codigoGuiaX, codigoGuiaY + 36, {
+                    width: codigoWidth,
+                    align: 'right'
+                });
+            }
+
             y += 55;
 
             // Línea separadora
@@ -474,6 +484,26 @@ function formatDate(date) {
         hour: '2-digit',
         minute: '2-digit'
     });
+}
+
+/**
+ * Formatea la hora en formato HH:MM:SS
+ * @param {Date|String} date - Fecha a formatear
+ * @returns {String} Hora formateada
+ */
+function formatTime(date) {
+    if (!date) return '';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '';
+    
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours ? hours : 12; // La hora '0' debe ser '12'
+    
+    return `${hours}:${minutes} ${ampm}`;
 }
 
 module.exports = {
