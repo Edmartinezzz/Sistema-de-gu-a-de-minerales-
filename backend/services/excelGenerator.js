@@ -128,35 +128,41 @@ async function generateGuiasDetalladasExcel(guias, period, adminUser) {
         
         // 1. Intentar calcular desde el monto_usd de la guía si existe
         const montoUsdGuia = parseFloat(g.monto_usd || 0);
-        if (montoUsdGuia > 0 && tasa > 0) {
-            totalGuia = montoUsdGuia * tasa;
-        } else if (g.materiales) {
-            // 2. Si no hay monto_usd, calcular desde materiales
-            let mats = g.materiales;
-            if (typeof mats === 'string') {
-                try { mats = JSON.parse(mats); } catch(e) { mats = []; }
-            }
-            
-            if (Array.isArray(mats)) {
-                mats.forEach(m => {
-                    const cant = parseFloat(m.cantidad || 0);
-                    const precioUsd = parseFloat(m.precio_unitario || 0);
-                    const precioBsRaw = parseFloat(m.precio_unitario_bs || 0);
-
-                    // Preferir precio_unitario (USD) * tasa para mayor precisión
-                    if (precioUsd > 0 && tasa > 0) {
-                        totalGuia += (cant * precioUsd * tasa);
-                    } else if (precioBsRaw > 0) {
-                        // Fallback al precio en Bs si no hay USD/Tasa
-                        totalGuia += (cant * precioBsRaw);
-                    }
-                });
-            }
+        
+        // Parsear materiales
+        let mats = g.materiales;
+        if (typeof mats === 'string') {
+            try { mats = JSON.parse(mats); } catch(e) { mats = []; }
         }
 
-        // Si después de todo sigue siendo 0, y hay un monto_pagar (impuesto), mostrarlo
+        if (montoUsdGuia > 0 && tasa > 0) {
+            totalGuia = montoUsdGuia * tasa;
+        } else if (Array.isArray(mats) && mats.length > 0) {
+            // 2. Si no hay monto_usd, calcular desde materiales
+            mats.forEach(m => {
+                const cant = parseFloat(m.cantidad || 0);
+                const precioUsd = parseFloat(m.precio_unitario || 0);
+                const precioBsRaw = parseFloat(m.precio_unitario_bs || 0);
+
+                if (precioUsd > 0 && tasa > 0) {
+                    totalGuia += (cant * precioUsd * tasa);
+                } else if (precioBsRaw > 0) {
+                    totalGuia += (cant * precioBsRaw);
+                }
+            });
+        }
+
         if (totalGuia === 0) {
             totalGuia = parseFloat(g.monto_pagar || 0) + parseFloat(g.monto_recargo || 0);
+        }
+
+        // Preparar descripción de materiales y cantidad total
+        let mineralDesc = g.tipo_mineral || 'N/A';
+        let cantidadTotal = parseFloat(g.cantidad || 0);
+
+        if (Array.isArray(mats) && mats.length > 0) {
+            mineralDesc = mats.map(m => `${m.nombre} (${m.cantidad} ${m.unidad || 'm³'})`).join(', ');
+            cantidadTotal = mats.reduce((sum, m) => sum + parseFloat(m.cantidad || 0), 0);
         }
 
         const row = worksheet.addRow({
@@ -164,9 +170,9 @@ async function generateGuiasDetalladasExcel(guias, period, adminUser) {
             empresa: g.empresa_nombre || 'N/A',
             cliente: g.cliente_nombre || 'N/A',
             numero: formatNumeroGuia(g.numero_guia, g.codigo_letra),
-            mineral: g.tipo_mineral || 'N/A',
-            cantidad: parseFloat(g.cantidad || 0),
-            unidad: g.unidad || 'N/A',
+            mineral: mineralDesc,
+            cantidad: cantidadTotal,
+            unidad: g.unidad || 'm³',
             total: totalGuia,
             estado: g.estado
         });

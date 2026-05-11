@@ -283,13 +283,32 @@ async function generateGuiasDetalladasPDF(guias, period, adminUser) {
                 totalBsGlobal += totalGuia;
                 totalGuias++;
 
-                // Acumular por material para el resumen final
-                const materialKey = g.tipo_mineral || 'N/A';
-                if (!totalesPorMaterial[materialKey]) {
-                    totalesPorMaterial[materialKey] = { cantidad: 0, unidad: g.unidad || 'N/A' };
+                // Acumular por material para el resumen final (Manejo de multi-materiales)
+                let mats = g.materiales;
+                if (typeof mats === 'string') {
+                    try { mats = JSON.parse(mats); } catch(e) { mats = []; }
                 }
-                totalesPorMaterial[materialKey].cantidad += parseFloat(g.cantidad || 0);
-                totalCantidadGlobal += parseFloat(g.cantidad || 0);
+
+                if (Array.isArray(mats) && mats.length > 0) {
+                    mats.forEach(m => {
+                        const materialKey = m.nombre || 'N/A';
+                        const cant = parseFloat(m.cantidad || 0);
+                        if (!totalesPorMaterial[materialKey]) {
+                            totalesPorMaterial[materialKey] = { cantidad: 0, unidad: m.unidad || 'm³' };
+                        }
+                        totalesPorMaterial[materialKey].cantidad += cant;
+                        totalCantidadGlobal += cant;
+                    });
+                } else {
+                    // Fallback para guías antiguas sin el campo JSONB materiales
+                    const materialKey = g.tipo_mineral || 'N/A';
+                    const cant = parseFloat(g.cantidad || 0);
+                    if (!totalesPorMaterial[materialKey]) {
+                        totalesPorMaterial[materialKey] = { cantidad: 0, unidad: g.unidad || 'm³' };
+                    }
+                    totalesPorMaterial[materialKey].cantidad += cant;
+                    totalCantidadGlobal += cant;
+                }
 
                 if (y > 500) {
                     doc.addPage();
@@ -347,20 +366,24 @@ async function generateGuiasDetalladasPDF(guias, period, adminUser) {
                 y += 20;
             }
 
-            // Nueva sección: Totales por Material
-            doc.rect(40, y, 240, 80).fill('#f8fafc').stroke(primaryColor);
+            // Nueva sección: Totales por Material (Dinámica)
+            const numMateriales = Object.keys(totalesPorMaterial).length;
+            const itemHeight = 12;
+            const headerHeight = 25;
+            const footerHeight = 20;
+            const boxHeight = Math.max(80, headerHeight + (numMateriales * itemHeight) + footerHeight);
+
+            doc.rect(40, y, 240, boxHeight).fill('#f8fafc').stroke(primaryColor);
             doc.fillColor(primaryColor).fontSize(11).font('Helvetica-Bold');
             doc.text('TOTALES POR MATERIAL', 50, y + 10);
             doc.fillColor(textColor).fontSize(9).font('Helvetica');
             
             let matY = y + 30;
             Object.keys(totalesPorMaterial).forEach(mat => {
-                if (matY < y + 70) {
-                    const cantFormateada = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2 }).format(totalesPorMaterial[mat].cantidad);
-                    doc.text(`${mat}:`, 50, matY, { width: 150 });
-                    doc.text(`${cantFormateada} ${totalesPorMaterial[mat].unidad}`, 50, matY, { width: 220, align: 'right' });
-                    matY += 12;
-                }
+                const cantFormateada = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2 }).format(totalesPorMaterial[mat].cantidad);
+                doc.text(`${mat}:`, 50, matY, { width: 150 });
+                doc.text(`${cantFormateada} ${totalesPorMaterial[mat].unidad}`, 50, matY, { width: 220, align: 'right' });
+                matY += itemHeight;
             });
 
             // Fila de Total de Cantidades
