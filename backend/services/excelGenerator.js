@@ -80,8 +80,8 @@ async function generateGuiasAgrupadasExcel(datos, period, adminUser) {
             total: v.total_bs
         });
 
-        // Formato moneda
-        row.getCell('total').numFmt = '#,##0.00 "Bs."';
+        // Formato moneda con separadores de miles y decimales
+        row.getCell('total').numFmt = '#,##0.00';
     });
 
     // Fila de total
@@ -123,18 +123,40 @@ async function generateGuiasDetalladasExcel(guias, period, adminUser) {
     };
 
     guias.forEach(g => {
-        let totalGuia = parseFloat(g.monto_pagar || 0) + parseFloat(g.monto_recargo || 0);
+        let totalGuia = 0;
+        const tasa = parseFloat(g.tasa_bcv || 0);
         
-        if (totalGuia === 0 && g.materiales) {
+        // 1. Intentar calcular desde el monto_usd de la guía si existe
+        const montoUsdGuia = parseFloat(g.monto_usd || 0);
+        if (montoUsdGuia > 0 && tasa > 0) {
+            totalGuia = montoUsdGuia * tasa;
+        } else if (g.materiales) {
+            // 2. Si no hay monto_usd, calcular desde materiales
             let mats = g.materiales;
             if (typeof mats === 'string') {
                 try { mats = JSON.parse(mats); } catch(e) { mats = []; }
             }
+            
             if (Array.isArray(mats)) {
                 mats.forEach(m => {
-                    totalGuia += (parseFloat(m.cantidad || 0) * parseFloat(m.precio_unitario_bs || 0));
+                    const cant = parseFloat(m.cantidad || 0);
+                    const precioUsd = parseFloat(m.precio_unitario || 0);
+                    const precioBsRaw = parseFloat(m.precio_unitario_bs || 0);
+
+                    // Preferir precio_unitario (USD) * tasa para mayor precisión
+                    if (precioUsd > 0 && tasa > 0) {
+                        totalGuia += (cant * precioUsd * tasa);
+                    } else if (precioBsRaw > 0) {
+                        // Fallback al precio en Bs si no hay USD/Tasa
+                        totalGuia += (cant * precioBsRaw);
+                    }
                 });
             }
+        }
+
+        // Si después de todo sigue siendo 0, y hay un monto_pagar (impuesto), mostrarlo
+        if (totalGuia === 0) {
+            totalGuia = parseFloat(g.monto_pagar || 0) + parseFloat(g.monto_recargo || 0);
         }
 
         const row = worksheet.addRow({

@@ -563,19 +563,34 @@ router.get('/guias-agrupadas-pdf', authenticateToken, requireRole(['master']), a
                 };
             }
 
-            let totalGuia = parseFloat(g.monto_pagar || 0) + parseFloat(g.monto_recargo || 0);
-            
-            // Si es 0, calculamos desde materiales
-            if (totalGuia === 0 && g.materiales) {
+            let totalGuia = 0;
+            const tasa = parseFloat(g.tasa_bcv || 0);
+            const montoUsdGuia = parseFloat(g.monto_usd || 0);
+
+            if (montoUsdGuia > 0 && tasa > 0) {
+                totalGuia = montoUsdGuia * tasa;
+            } else if (g.materiales) {
                 let mats = g.materiales;
                 if (typeof mats === 'string') {
                     try { mats = JSON.parse(mats); } catch(e) { mats = []; }
                 }
                 if (Array.isArray(mats)) {
                     mats.forEach(m => {
-                        totalGuia += (parseFloat(m.cantidad || 0) * parseFloat(m.precio_unitario_bs || 0));
+                        const cant = parseFloat(m.cantidad || 0);
+                        const precioUsd = parseFloat(m.precio_unitario || 0);
+                        const precioBsRaw = parseFloat(m.precio_unitario_bs || 0);
+
+                        if (precioUsd > 0 && tasa > 0) {
+                            totalGuia += (cant * precioUsd * tasa);
+                        } else if (precioBsRaw > 0) {
+                            totalGuia += (cant * precioBsRaw);
+                        }
                     });
                 }
+            }
+
+            if (totalGuia === 0) {
+                totalGuia = parseFloat(g.monto_pagar || 0) + parseFloat(g.monto_recargo || 0);
             }
 
             empresasMap[g.empresa_id].cantidad_guias += 1;

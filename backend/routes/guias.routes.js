@@ -383,7 +383,7 @@ router.get('/', authenticateToken, async (req, res) => {
         }
 
         if (hasta) {
-            query += ` AND g.created_at <= $${paramCount}`;
+            query += ` AND g.created_at <= $${paramCount}::timestamp + interval '1 day' - interval '1 second'`;
             params.push(hasta);
             paramCount++;
         }
