@@ -226,8 +226,8 @@ async function generateGuiasDetalladasPDF(guias, period, adminUser) {
 
             // Tabla Headers
             const tableTop = 110;
-            const colWidths = [60, 100, 140, 60, 120, 70, 162];
-            const colNames = ['Fecha', 'Empresa', 'Cliente', 'N° Guía', 'Mineral / Material', 'Cant.', 'Total Bs.'];
+            const colWidths = [55, 85, 100, 55, 65, 100, 55, 197];
+            const colNames = ['Fecha', 'Empresa', 'Cliente', 'N° Guía', 'Placa', 'Mineral / Material', 'Cant.', 'Total Bs.'];
             
             doc.rect(40, tableTop - 5, 712, 25).fill(primaryColor);
             doc.fillColor('white');
@@ -347,13 +347,15 @@ async function generateGuiasDetalladasPDF(guias, period, adminUser) {
                 x += colWidths[2];
                 doc.text(formatNumeroGuia(g.numero_guia, g.codigo_letra), x, y);
                 x += colWidths[3];
-                doc.text(g.tipo_mineral || 'N/A', x, y, { width: colWidths[4] - 5 });
+                doc.text(g.vehiculo_placa || 'N/A', x, y, { width: colWidths[4] - 5 });
                 x += colWidths[4];
-                doc.text(`${g.cantidad} ${g.unidad}`, x, y, { width: colWidths[5] - 5 });
+                doc.text(g.tipo_mineral || 'N/A', x, y, { width: colWidths[5] - 5 });
                 x += colWidths[5];
+                doc.text(`${g.cantidad} ${g.unidad}`, x, y, { width: colWidths[6] - 5 });
+                x += colWidths[6];
                 
                 const bsFormatted = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalGuia);
-                doc.text(bsFormatted, x, y, { width: colWidths[6] - 5, align: 'right' });
+                doc.text(bsFormatted, x, y, { width: colWidths[7] - 5, align: 'right' });
 
                 y += 25;
             });
