@@ -742,12 +742,45 @@ router.get('/:id/pdf', authenticateToken, async (req, res) => {
 
         const guia = result.rows[0];
 
-        // Ventana de acceso 8 AM - 6 PM
+        // Ventana de acceso 8 AM - 6 PM en hora de Venezuela (America/Caracas)
         const now = new Date();
-        const hour = now.getHours();
+        let hour = now.getHours();
+        let isToday = false;
+
+        try {
+            // Obtener la hora local de Caracas (0-23)
+            const hourFormatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'America/Caracas',
+                hour: 'numeric',
+                hour12: false
+            });
+            hour = parseInt(hourFormatter.format(now), 10);
+
+            // Obtener fechas localizadas en "America/Caracas"
+            const dateFormatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'America/Caracas',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+
+            const nowParts = dateFormatter.formatToParts(now);
+            const nowCaracasString = `${nowParts.find(p => p.type === 'year').value}-${nowParts.find(p => p.type === 'month').value}-${nowParts.find(p => p.type === 'day').value}`;
+
+            const createdDate = new Date(guia.created_at);
+            const createdParts = dateFormatter.formatToParts(createdDate);
+            const createdCaracasString = `${createdParts.find(p => p.type === 'year').value}-${createdParts.find(p => p.type === 'month').value}-${createdParts.find(p => p.type === 'day').value}`;
+
+            isToday = nowCaracasString === createdCaracasString;
+        } catch (tzError) {
+            console.error('Error calculando timezone en guias.routes.js:', tzError);
+            // Fallback en caso de error
+            hour = now.getHours();
+            const createdDate = new Date(guia.created_at);
+            isToday = createdDate.toDateString() === now.toDateString();
+        }
+
         const isWithinWindow = hour >= 8 && hour < 18;
-        const createdDate = new Date(guia.created_at);
-        const isToday = createdDate.toDateString() === now.toDateString();
 
         if (guia.estado !== 'activa' && guia.estado !== 'usada' && guia.estado !== 'vencida') {
             if (!(isToday && isWithinWindow)) {

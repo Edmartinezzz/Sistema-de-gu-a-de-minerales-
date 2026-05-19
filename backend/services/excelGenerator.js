@@ -32,7 +32,7 @@ async function generateVerificacionesExcel(verificaciones, fiscalizador) {
     // Agregar datos
     verificaciones.forEach(v => {
         worksheet.addRow({
-            fecha: new Date(v.fecha_verificacion).toLocaleDateString('es-VE'),
+            fecha: new Date(v.fecha_verificacion).toLocaleDateString('es-VE', { timeZone: 'America/Caracas' }),
             guia: v.numero_guia,
             mineral: v.tipo_mineral,
             cantidad: v.cantidad,
@@ -167,7 +167,7 @@ async function generateGuiasDetalladasExcel(guias, period, adminUser) {
         }
 
         const row = worksheet.addRow({
-            fecha: new Date(g.created_at).toLocaleDateString('es-VE'),
+            fecha: new Date(g.created_at).toLocaleDateString('es-VE', { timeZone: 'America/Caracas' }),
             empresa: g.empresa_nombre || 'N/A',
             cliente: g.cliente_nombre || 'N/A',
             numero: formatNumeroGuia(g.numero_guia, g.codigo_letra),

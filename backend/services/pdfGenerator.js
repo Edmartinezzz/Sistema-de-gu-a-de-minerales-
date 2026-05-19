@@ -468,22 +468,45 @@ function drawLabelValue(doc, x, y, width, label, value) {
 function formatDateShort(date) {
     if (!date) return '';
     const d = new Date(date);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
+    if (isNaN(d.getTime())) return '';
+    try {
+        const formatter = new Intl.DateTimeFormat('es-VE', {
+            timeZone: 'America/Caracas',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+        return formatter.format(d);
+    } catch (e) {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+    }
 }
 
 function formatDate(date) {
     if (!date) return 'N/A';
     const d = new Date(date);
-    return d.toLocaleDateString('es-VE', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+    if (isNaN(d.getTime())) return 'N/A';
+    try {
+        return d.toLocaleDateString('es-VE', {
+            timeZone: 'America/Caracas',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (e) {
+        return d.toLocaleDateString('es-VE', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
 }
 
 /**
@@ -496,14 +519,24 @@ function formatTime(date) {
     const d = new Date(date);
     if (isNaN(d.getTime())) return '';
     
-    let hours = d.getHours();
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    
-    hours = hours % 12;
-    hours = hours ? hours : 12; // La hora '0' debe ser '12'
-    
-    return `${hours}:${minutes} ${ampm}`;
+    try {
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Caracas',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+        return formatter.format(d);
+    } catch (e) {
+        let hours = d.getHours();
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        
+        hours = hours % 12;
+        hours = hours ? hours : 12; // La hora '0' debe ser '12'
+        
+        return `${hours}:${minutes} ${ampm}`;
+    }
 }
 
 module.exports = {

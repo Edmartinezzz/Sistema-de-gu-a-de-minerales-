@@ -24,7 +24,7 @@ async function generateVerificacionesPDF(verificaciones, fiscalizador) {
             doc.fontSize(16).font('Helvetica-Bold').text('REPORTE DE VERIFICACIONES DE GUÍAS', { align: 'center' });
             doc.moveDown(0.5);
             doc.fontSize(10).font('Helvetica').text(`Generado por: ${fiscalizador.username}`, { align: 'center' });
-            doc.text(`Fecha de Reporte: ${new Date().toLocaleString('es-VE')}`, { align: 'center' });
+            doc.text(`Fecha de Reporte: ${new Date().toLocaleString('es-VE', { timeZone: 'America/Caracas' })}`, { align: 'center' });
             doc.moveDown(2);
 
             // Tabla Headers
@@ -51,7 +51,7 @@ async function generateVerificacionesPDF(verificaciones, fiscalizador) {
                     y = 50;
                 }
 
-                const fecha = new Date(v.fecha_verificacion).toLocaleDateString('es-VE');
+                const fecha = new Date(v.fecha_verificacion).toLocaleDateString('es-VE', { timeZone: 'America/Caracas' });
                 const vehiculo = v.vehiculo_placa || 'N/A';
                 
                 x = 50;
@@ -98,7 +98,7 @@ async function generateGuiasAgrupadasPDF(datos, period, adminUser) {
             doc.fillColor('white').fontSize(20).font('Helvetica-Bold').text('SISTEMA DE CONTROL DE MINERALES', 40, 25);
             doc.fontSize(12).font('Helvetica').text('Resumen Consolidado de Guías Emitidas', 40, 50);
             
-            doc.fillColor('white').fontSize(10).text(`FECHA: ${new Date().toLocaleDateString('es-VE')}`, 450, 35, { align: 'right' });
+            doc.fillColor('white').fontSize(10).text(`FECHA: ${new Date().toLocaleDateString('es-VE', { timeZone: 'America/Caracas' })}`, 450, 35, { align: 'right' });
             
             let periodText = 'Periodo: Historico';
             if (period.desde && period.hasta) {
@@ -213,7 +213,7 @@ async function generateGuiasDetalladasPDF(guias, period, adminUser) {
             doc.fontSize(12).font('Helvetica').text('Reporte Detallado de Guías Emitidas', 40, 50);
             
             doc.fillColor('white').fontSize(10).text(`ADMIN: ${adminUser.username}`, 600, 25, { align: 'right' });
-            doc.text(`FECHA: ${new Date().toLocaleDateString('es-VE')}`, 600, 40, { align: 'right' });
+            doc.text(`FECHA: ${new Date().toLocaleDateString('es-VE', { timeZone: 'America/Caracas' })}`, 600, 40, { align: 'right' });
             
             let periodText = 'Periodo: Historico';
             if (period.desde && period.hasta) {
@@ -339,7 +339,7 @@ async function generateGuiasDetalladasPDF(guias, period, adminUser) {
                 doc.rect(40, y - 5, 712, 25).stroke('#e5e7eb');
 
                 x = 45;
-                doc.text(new Date(g.created_at).toLocaleDateString('es-VE'), x, y);
+                doc.text(new Date(g.created_at).toLocaleDateString('es-VE', { timeZone: 'America/Caracas' }), x, y);
                 x += colWidths[0];
                 doc.text(g.empresa_nombre || 'N/A', x, y, { width: colWidths[1] - 5 });
                 x += colWidths[1];
