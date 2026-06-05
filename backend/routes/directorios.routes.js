@@ -5,8 +5,11 @@ const { sanitizeInput } = require('../utils/security');
 
 const router = express.Router();
 
-// Validar que el usuario tenga un empresaId asignado
+// Validar que el usuario tenga un empresaId asignado (se omite para master)
 const requireEmpresaId = (req, res, next) => {
+    if (req.user && req.user.role === 'master') {
+        return next();
+    }
     if (!req.user || !req.user.empresaId) {
         return res.status(403).json({ error: 'Acceso denegado. Este usuario no está asociado a una empresa.' });
     }
@@ -15,7 +18,7 @@ const requireEmpresaId = (req, res, next) => {
 
 // Aplicar seguridad a todas las rutas de este enrutador
 router.use(authenticateToken);
-router.use(requireRole(['empresa']));
+router.use(requireRole(['empresa', 'master']));
 router.use(requireEmpresaId);
 
 // ==========================================
@@ -25,10 +28,27 @@ router.use(requireEmpresaId);
 // GET: Listar clientes de la cantera
 router.get('/clientes', async (req, res) => {
     try {
-        const result = await db.query(
-            'SELECT * FROM cantera_clientes WHERE empresa_id = $1 ORDER BY nombre ASC',
-            [req.user.empresaId]
-        );
+        let result;
+        if (req.user.role === 'master') {
+            const { empresa_id } = req.query;
+            let query = `
+                SELECT c.*, e.razon_social as empresa_nombre 
+                FROM cantera_clientes c
+                JOIN empresas e ON c.empresa_id = e.id
+            `;
+            const params = [];
+            if (empresa_id) {
+                query += ' WHERE c.empresa_id = $1';
+                params.push(empresa_id);
+            }
+            query += ' ORDER BY e.razon_social ASC, c.nombre ASC';
+            result = await db.query(query, params);
+        } else {
+            result = await db.query(
+                'SELECT * FROM cantera_clientes WHERE empresa_id = $1 ORDER BY nombre ASC',
+                [req.user.empresaId]
+            );
+        }
         res.json({ success: true, clientes: result.rows });
     } catch (error) {
         console.error('Error al obtener clientes del directorio:', error);
@@ -37,7 +57,7 @@ router.get('/clientes', async (req, res) => {
 });
 
 // POST: Agregar un cliente al directorio
-router.post('/clientes', async (req, res) => {
+router.post('/clientes', requireRole(['empresa']), async (req, res) => {
     try {
         const { rif, nombre, direccion, telefono } = req.body;
 
@@ -75,7 +95,7 @@ router.post('/clientes', async (req, res) => {
 });
 
 // PUT: Modificar un cliente
-router.put('/clientes/:id', async (req, res) => {
+router.put('/clientes/:id', requireRole(['empresa']), async (req, res) => {
     try {
         const { id } = req.params;
         const { rif, nombre, direccion, telefono } = req.body;
@@ -125,7 +145,7 @@ router.put('/clientes/:id', async (req, res) => {
 });
 
 // DELETE: Eliminar un cliente
-router.delete('/clientes/:id', async (req, res) => {
+router.delete('/clientes/:id', requireRole(['empresa']), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -152,10 +172,27 @@ router.delete('/clientes/:id', async (req, res) => {
 // GET: Listar choferes
 router.get('/choferes', async (req, res) => {
     try {
-        const result = await db.query(
-            'SELECT * FROM cantera_choferes WHERE empresa_id = $1 ORDER BY nombre ASC',
-            [req.user.empresaId]
-        );
+        let result;
+        if (req.user.role === 'master') {
+            const { empresa_id } = req.query;
+            let query = `
+                SELECT c.*, e.razon_social as empresa_nombre 
+                FROM cantera_choferes c
+                JOIN empresas e ON c.empresa_id = e.id
+            `;
+            const params = [];
+            if (empresa_id) {
+                query += ' WHERE c.empresa_id = $1';
+                params.push(empresa_id);
+            }
+            query += ' ORDER BY e.razon_social ASC, c.nombre ASC';
+            result = await db.query(query, params);
+        } else {
+            result = await db.query(
+                'SELECT * FROM cantera_choferes WHERE empresa_id = $1 ORDER BY nombre ASC',
+                [req.user.empresaId]
+            );
+        }
         res.json({ success: true, choferes: result.rows });
     } catch (error) {
         console.error('Error al obtener choferes del directorio:', error);
@@ -164,7 +201,7 @@ router.get('/choferes', async (req, res) => {
 });
 
 // POST: Agregar chofer
-router.post('/choferes', async (req, res) => {
+router.post('/choferes', requireRole(['empresa']), async (req, res) => {
     try {
         const { cedula, nombre, telefono } = req.body;
 
@@ -200,7 +237,7 @@ router.post('/choferes', async (req, res) => {
 });
 
 // PUT: Modificar chofer
-router.put('/choferes/:id', async (req, res) => {
+router.put('/choferes/:id', requireRole(['empresa']), async (req, res) => {
     try {
         const { id } = req.params;
         const { cedula, nombre, telefono } = req.body;
@@ -247,7 +284,7 @@ router.put('/choferes/:id', async (req, res) => {
 });
 
 // DELETE: Eliminar chofer
-router.delete('/choferes/:id', async (req, res) => {
+router.delete('/choferes/:id', requireRole(['empresa']), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -274,10 +311,27 @@ router.delete('/choferes/:id', async (req, res) => {
 // GET: Listar vehículos
 router.get('/vehiculos', async (req, res) => {
     try {
-        const result = await db.query(
-            'SELECT * FROM cantera_vehiculos WHERE empresa_id = $1 ORDER BY placa ASC',
-            [req.user.empresaId]
-        );
+        let result;
+        if (req.user.role === 'master') {
+            const { empresa_id } = req.query;
+            let query = `
+                SELECT v.*, e.razon_social as empresa_nombre 
+                FROM cantera_vehiculos v
+                JOIN empresas e ON v.empresa_id = e.id
+            `;
+            const params = [];
+            if (empresa_id) {
+                query += ' WHERE v.empresa_id = $1';
+                params.push(empresa_id);
+            }
+            query += ' ORDER BY e.razon_social ASC, v.placa ASC';
+            result = await db.query(query, params);
+        } else {
+            result = await db.query(
+                'SELECT * FROM cantera_vehiculos WHERE empresa_id = $1 ORDER BY placa ASC',
+                [req.user.empresaId]
+            );
+        }
         res.json({ success: true, vehiculos: result.rows });
     } catch (error) {
         console.error('Error al obtener vehículos del directorio:', error);
@@ -286,7 +340,7 @@ router.get('/vehiculos', async (req, res) => {
 });
 
 // POST: Agregar vehículo
-router.post('/vehiculos', async (req, res) => {
+router.post('/vehiculos', requireRole(['empresa']), async (req, res) => {
     try {
         const { placa, marca, modelo, color, carroceria } = req.body;
 
@@ -324,7 +378,7 @@ router.post('/vehiculos', async (req, res) => {
 });
 
 // PUT: Modificar vehículo
-router.put('/vehiculos/:id', async (req, res) => {
+router.put('/vehiculos/:id', requireRole(['empresa']), async (req, res) => {
     try {
         const { id } = req.params;
         const { placa, marca, modelo, color, carroceria } = req.body;
@@ -373,7 +427,7 @@ router.put('/vehiculos/:id', async (req, res) => {
 });
 
 // DELETE: Eliminar vehículo
-router.delete('/vehiculos/:id', async (req, res) => {
+router.delete('/vehiculos/:id', requireRole(['empresa']), async (req, res) => {
     try {
         const { id } = req.params;
 

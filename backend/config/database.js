@@ -34,7 +34,17 @@ pool.on('error', (err) => {
     process.exit(-1);
 });
 
+// Probar conexión inmediatamente al iniciar
+pool.query('SELECT NOW()')
+    .then(() => {
+        console.log('✓ Conectado a la base de datos PostgreSQL (Supabase)');
+    })
+    .catch((err) => {
+        console.error('❌ Error al conectar con la base de datos en el inicio:', err.message);
+    });
+
 module.exports = {
     query: (text, params) => pool.query(text, params),
     pool
 };
+
