@@ -2431,7 +2431,6 @@ async function solicitarGuiaDefinitiva() {
                     html: `📋 <strong>Número:</strong> ${response.guia.numero_guia}<br>💰 <strong>Tasa BCV:</strong> ${response.guia.tasa_bcv} Bs./$<br>💰 <strong>Monto:</strong> Bs. ${formatNumber(response.guia.monto_pagar)}`,
                     confirmButtonColor: '#1a5f7a'
                 });
->>>>>>> bcb5934 (feat: modulo de directorios y correccion de errores)
             }
             cerrarModalGuia();
             loadDashboard();
