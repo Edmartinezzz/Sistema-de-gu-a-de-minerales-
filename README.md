@@ -1,4 +1,4 @@
-# Despacho Gas+
+SISTEMA GUIAS DE MOVIIZACION VERSION OFICIAL
 
 Plataforma Premium de Despacho Inteligente de Gas. Sistema bimonetario con gestión de cuotas de combustible (Gasolina/Gasoil) y portal de beneficiarios.
 
