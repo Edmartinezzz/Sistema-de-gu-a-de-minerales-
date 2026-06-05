@@ -31,7 +31,10 @@ router.post('/solicitar', authenticateToken, requireRole(['empresa', 'contribuye
             cliente_nombre,
             cliente_rif,
             cliente_direccion,
-            observaciones
+            observaciones,
+            guardar_cliente_dir,
+            guardar_conductor_dir,
+            guardar_vehiculo_dir
         } = req.body;
         
         // Obtener tasa actual y configuración de pagos
@@ -145,6 +148,44 @@ router.post('/solicitar', authenticateToken, requireRole(['empresa', 'contribuye
             [req.user.id, 'crear_guia', 'guias_movilizacion', guia.id,
             JSON.stringify({ numero_guia: guia.numero_guia, materiales_count: materiales.length, monto_pagar: monto_total_pagar_bs }), truncateIP(req.ip)]
         );
+
+        // Inserción automática en los directorios si se solicita
+        if (guardar_cliente_dir === true || guardar_cliente_dir === 'true') {
+            await client.query(
+                `INSERT INTO cantera_clientes (empresa_id, rif, nombre, direccion)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (empresa_id, rif) 
+                 DO UPDATE SET nombre = EXCLUDED.nombre, direccion = EXCLUDED.direccion`,
+                [req.user.empresaId, sanitizeInput(cliente_rif).trim().toUpperCase(), sanitizeInput(cliente_nombre).trim(), sanitizeInput(cliente_direccion).trim()]
+            );
+        }
+
+        if (guardar_conductor_dir === true || guardar_conductor_dir === 'true') {
+            await client.query(
+                `INSERT INTO cantera_choferes (empresa_id, cedula, nombre)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (empresa_id, cedula) 
+                 DO UPDATE SET nombre = EXCLUDED.nombre`,
+                [req.user.empresaId, sanitizeInput(conductor_cedula).trim().toUpperCase(), sanitizeInput(conductor_nombre).trim()]
+            );
+        }
+
+        if (guardar_vehiculo_dir === true || guardar_vehiculo_dir === 'true') {
+            await client.query(
+                `INSERT INTO cantera_vehiculos (empresa_id, placa, marca, modelo, color, carroceria)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 ON CONFLICT (empresa_id, placa) 
+                 DO UPDATE SET marca = EXCLUDED.marca, modelo = EXCLUDED.modelo, color = EXCLUDED.color, carroceria = EXCLUDED.carroceria`,
+                [
+                    req.user.empresaId, 
+                    sanitizeInput(vehiculo_placa).trim().toUpperCase(), 
+                    sanitizeInput(vehiculo_marca).trim(), 
+                    sanitizeInput(vehiculo_modelo).trim(), 
+                    sanitizeInput(vehiculo_color).trim(), 
+                    sanitizeInput(vehiculo_carroceria).trim()
+                ]
+            );
+        }
 
         await client.query('COMMIT');
 

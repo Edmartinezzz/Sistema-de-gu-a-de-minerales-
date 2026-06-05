@@ -13,6 +13,7 @@ const confirmacionesRoutes = require('./routes/confirmaciones.routes');
 const empresasRoutes = require('./routes/empresas.routes');
 const sistemaRoutes = require('./routes/sistema.routes');
 const mineralesRoutes = require('./routes/minerales.routes');
+const directoriosRoutes = require('./routes/directorios.routes');
 const currencyService = require('./services/currencyService');
 
 const app = express();
@@ -61,6 +62,7 @@ app.use('/api/tracking', require('./routes/tracking.routes'));
 app.use('/api/empresas', empresasRoutes);
 app.use('/api/sistema', sistemaRoutes);
 app.use('/api/minerales', mineralesRoutes);
+app.use('/api/directorios', directoriosRoutes);
 app.use('/api/stats', require('./routes/stats.routes'));
 
 // ===== RUTA DE SALUD =====

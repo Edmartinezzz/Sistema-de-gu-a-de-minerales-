@@ -1457,3 +1457,7 @@ input:checked + .slider:before {
   border-radius: 50%;
 }
 
+/* Fix SweetAlert2 overlapping behind modal overlays */
+.swal2-container {
+  z-index: 999999 !important;
+}

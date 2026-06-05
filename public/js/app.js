@@ -223,6 +223,12 @@ function renderSidebar(role) {
                     <span>Solicitar Guía</span>
                 </a>
             </div>
+            <div class="nav-item">
+                <a href="#" class="nav-link" data-section="directorios">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                    <span>Directorios</span>
+                </a>
+            </div>
             ${systemConfig.modulo_pagos_habilitado === 'true' ? `
             <div class="nav-item">
                 <a href="#" class="nav-link" data-section="pagos">
@@ -383,6 +389,13 @@ function loadSectionContent(section) {
             break;
         case 'deudas':
             loadDeudasSection(content);
+            break;
+        case 'directorios':
+            if (currentUser.role === 'empresa') {
+                renderDirectorios(content);
+            } else {
+                content.innerHTML = '<div class="error-message">Acceso denegado</div>';
+            }
             break;
         case 'usuarios':
             if (currentUser.role === 'master') {
@@ -2057,22 +2070,26 @@ async function mostrarFormularioGuia() {
 
                         <!-- DATOS DEL CLIENTE -->
                         <div style="margin-bottom: 25px;">
-                            <h4 style="margin: 20px 0 15px; color: #1a5f7a; border-bottom: 2px solid #1a5f7a; padding-bottom: 5px; font-size: 18px;">
-                                Datos del Cliente
-                            </h4>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #1a5f7a; padding-bottom: 5px;">
+                                <h4 style="margin: 0; color: #1a5f7a; font-size: 18px;">Datos del Cliente</h4>
+                                <button type="button" onclick="abrirSelectorDirectorio('clientes')" style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,#1a5f7a,#2980b9);color:white;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(26,95,122,0.3);transition:all 0.2s;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                                    Directorio
+                                </button>
+                            </div>
                             <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px;">
                                 <div class="form-group">
                                     <label>Razón Social / Nombre *</label>
-                                    <input type="text" name="cliente_nombre" class="form-control" required placeholder="Nombre de la empresa o persona">
+                                    <input type="text" name="cliente_nombre" id="campo-cliente_nombre" class="form-control" required placeholder="Nombre de la empresa o persona">
                                 </div>
                                 <div class="form-group">
                                     <label>RIF / Cédula *</label>
-                                    <input type="text" name="cliente_rif" class="form-control" required placeholder="Ej: J-12345678-9">
+                                    <input type="text" name="cliente_rif" id="campo-cliente_rif" class="form-control" required placeholder="Ej: J-12345678-9">
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label>Dirección Fiscal *</label>
-                                <input type="text" name="cliente_direccion" class="form-control" required placeholder="Dirección legal del cliente">
+                                <input type="text" name="cliente_direccion" id="campo-cliente_direccion" class="form-control" required placeholder="Dirección legal del cliente">
                             </div>
                         </div>
 
@@ -2093,29 +2110,33 @@ async function mostrarFormularioGuia() {
 
                         <!-- DATOS DEL VEHÍCULO -->
                         <div style="margin-bottom: 25px;">
-                            <h4 style="margin: 20px 0 15px; color: #1a5f7a; border-bottom: 2px solid #1a5f7a; padding-bottom: 5px; font-size: 18px;">
-                                Datos del Vehículo
-                            </h4>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #1a5f7a; padding-bottom: 5px;">
+                                <h4 style="margin: 0; color: #1a5f7a; font-size: 18px;">Datos del Vehículo</h4>
+                                <button type="button" onclick="abrirSelectorDirectorio('vehiculos')" style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,#1a5f7a,#2980b9);color:white;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(26,95,122,0.3);transition:all 0.2s;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                                    Directorio
+                                </button>
+                            </div>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                                 <div class="form-group">
                                     <label>Marca *</label>
-                                    <input type="text" name="vehiculo_marca" class="form-control" required placeholder="Ej: Ford, Chevrolet">
+                                    <input type="text" name="vehiculo_marca" id="campo-vehiculo_marca" class="form-control" required placeholder="Ej: Ford, Chevrolet">
                                 </div>
                                 <div class="form-group">
                                     <label>Modelo *</label>
-                                    <input type="text" name="vehiculo_modelo" class="form-control" required placeholder="Ej: F-350, NPR">
+                                    <input type="text" name="vehiculo_modelo" id="campo-vehiculo_modelo" class="form-control" required placeholder="Ej: F-350, NPR">
                                 </div>
                                 <div class="form-group">
                                     <label>Color *</label>
-                                    <input type="text" name="vehiculo_color" class="form-control" required placeholder="Ej: Blanco, Rojo">
+                                    <input type="text" name="vehiculo_color" id="campo-vehiculo_color" class="form-control" required placeholder="Ej: Blanco, Rojo">
                                 </div>
                                 <div class="form-group">
                                     <label>Placa *</label>
-                                    <input type="text" name="vehiculo_placa" class="form-control" required placeholder="Ej: A1B2C3D" style="text-transform: uppercase;">
+                                    <input type="text" name="vehiculo_placa" id="campo-vehiculo_placa" class="form-control" required placeholder="Ej: A1B2C3D" style="text-transform: uppercase;">
                                 </div>
                                 <div class="form-group">
                                     <label>Tipo de Carrocería *</label>
-                                    <select name="vehiculo_carroceria" class="form-control" required>
+                                    <select name="vehiculo_carroceria" id="campo-vehiculo_carroceria" class="form-control" required>
                                         <option value="">Seleccione...</option>
                                         <option value="Volteo">Volteo</option>
                                         <option value="Plataforma">Plataforma</option>
@@ -2129,17 +2150,21 @@ async function mostrarFormularioGuia() {
 
                         <!-- DATOS DEL CONDUCTOR -->
                         <div style="margin-bottom: 25px;">
-                            <h4 style="margin: 20px 0 15px; color: #1a5f7a; border-bottom: 2px solid #1a5f7a; padding-bottom: 5px; font-size: 18px;">
-                                Datos del Conductor
-                            </h4>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #1a5f7a; padding-bottom: 5px;">
+                                <h4 style="margin: 0; color: #1a5f7a; font-size: 18px;">Datos del Conductor</h4>
+                                <button type="button" onclick="abrirSelectorDirectorio('choferes')" style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,#1a5f7a,#2980b9);color:white;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(26,95,122,0.3);transition:all 0.2s;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                                    Directorio
+                                </button>
+                            </div>
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                                 <div class="form-group">
                                     <label>Nombres y Apellidos *</label>
-                                    <input type="text" name="conductor_nombre" class="form-control" required placeholder="Nombre completo del conductor">
+                                    <input type="text" name="conductor_nombre" id="campo-conductor_nombre" class="form-control" required placeholder="Nombre completo del conductor">
                                 </div>
                                 <div class="form-group">
                                     <label>Cédula de Identidad *</label>
-                                    <input type="text" name="conductor_cedula" class="form-control" required placeholder="Ej: V-12345678">
+                                    <input type="text" name="conductor_cedula" id="campo-conductor_cedula" class="form-control" required placeholder="Ej: V-12345678">
                                 </div>
                             </div>
                         </div>
@@ -2331,7 +2356,58 @@ async function solicitarGuiaDefinitiva() {
         return;
     }
 
-    const data = tempGuiaData;
+    const data = { ...tempGuiaData };
+
+    // ===== DETECCIÓN INTELIGENTE DE DATOS NUEVOS =====
+    try {
+        const [clientesRes, choferesRes, vehiculosRes] = await Promise.all([
+            apiRequest('/directorios/clientes'),
+            apiRequest('/directorios/choferes'),
+            apiRequest('/directorios/vehiculos')
+        ]);
+
+        const clientes  = clientesRes.clientes  || [];
+        const choferes  = choferesRes.choferes  || [];
+        const vehiculos = vehiculosRes.vehiculos || [];
+
+        const rifNorm   = (data.cliente_rif     || '').trim().toUpperCase();
+        const cedNorm   = (data.conductor_cedula || '').trim().toUpperCase();
+        const placaNorm = (data.vehiculo_placa   || '').trim().toUpperCase();
+
+        const clienteNuevo  = rifNorm   && !clientes.some(c => c.rif.toUpperCase()    === rifNorm);
+        const conductorNuevo = cedNorm  && !choferes.some(c => c.cedula.toUpperCase() === cedNorm);
+        const vehiculoNuevo  = placaNorm && !vehiculos.some(v => v.placa.toUpperCase() === placaNorm);
+
+        // Construir mensaje según lo que sea nuevo
+        if (clienteNuevo || conductorNuevo || vehiculoNuevo) {
+            const nuevos = [];
+            if (clienteNuevo)   nuevos.push(`📋 Cliente: <strong>${data.cliente_nombre}</strong> (RIF: ${rifNorm})`);
+            if (conductorNuevo) nuevos.push(`🧑 Conductor: <strong>${data.conductor_nombre}</strong> (Cédula: ${cedNorm})`);
+            if (vehiculoNuevo)  nuevos.push(`🚛 Vehículo: <strong>${data.vehiculo_marca} ${data.vehiculo_modelo}</strong> (Placa: ${placaNorm})`);
+
+            const result = await Swal.fire({
+                title: '📂 Datos nuevos detectados',
+                html: `Hemos detectado los siguientes datos que no están en tu directorio:<br><br>${nuevos.join('<br>')}.<br><br>¿Deseas guardarlos en tu directorio para usarlos en el futuro?`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '✅ Sí, guardar',
+                cancelButtonText: '❌ No, continuar sin guardar',
+                confirmButtonColor: '#1a5f7a',
+                cancelButtonColor: '#6c757d',
+                reverseButtons: false
+            });
+
+            if (result.isConfirmed) {
+                if (clienteNuevo)   data.guardar_cliente_dir   = true;
+                if (conductorNuevo) data.guardar_conductor_dir = true;
+                if (vehiculoNuevo)  data.guardar_vehiculo_dir  = true;
+            }
+        }
+    } catch (dirErr) {
+        // Si falla la consulta de directorios, ignorar y continuar normalmente
+        console.warn('No se pudo verificar directorios:', dirErr.message);
+    }
+    // ===== FIN DETECCIÓN INTELIGENTE =====
 
     showLoading(true);
 
@@ -2340,9 +2416,15 @@ async function solicitarGuiaDefinitiva() {
 
         if (response.success) {
             if (response.details) {
-                alert(`âš ï¸ ${response.message}\n\nDetalles del error PDF: ${response.details}\n\n📋 Número de Guía: ${response.guia.numero_guia}\nðŸ’° Tasa BCV: ${response.guia.tasa_bcv} Bs./$\n💰 Monto: Bs. ${formatNumber(response.guia.monto_pagar)}`);
+                alert(`⚠️ ${response.message}\n\nDetalles del error PDF: ${response.details}\n\n📋 Número de Guía: ${response.guia.numero_guia}\n💰 Tasa BCV: ${response.guia.tasa_bcv} Bs./$\n💰 Monto: Bs. ${formatNumber(response.guia.monto_pagar)}`);
             } else {
-                alert(`âœ… Guía solicitada exitosamente.\n\n📋 Número de Guía: ${response.guia.numero_guia}\nðŸ’° Tasa BCV Aplicada: ${response.guia.tasa_bcv} Bs./$\n💰 Monto Total a Pagar: Bs. ${formatNumber(response.guia.monto_pagar)}\nðŸ¦ Banco: ${response.guia.banco}\nðŸ’³ Cuenta: ${response.guia.cuenta}\n\nPor favor, realice el pago y suba el comprobante.`);
+                Swal.fire({
+                    icon: 'success',
+                    title: '✅ Guía generada exitosamente',
+                    html: `📋 <strong>Número:</strong> ${response.guia.numero_guia}<br>💰 <strong>Tasa BCV:</strong> ${response.guia.tasa_bcv} Bs./$<br>💰 <strong>Monto:</strong> Bs. ${formatNumber(response.guia.monto_pagar)}`,
+                    confirmButtonColor: '#1a5f7a'
+                });
+>>>>>>> bcb5934 (feat: modulo de directorios y correccion de errores)
             }
             cerrarModalGuia();
             loadDashboard();
@@ -5040,4 +5122,318 @@ async function eliminarMineral(id, nombre) {
             showLoading(false);
         }
     }
+}
+
+// =====================================================================
+//   MÓDULO DE DIRECTORIOS
+//   Permite a las canteras guardar Clientes, Choferes y Vehículos
+// =====================================================================
+
+let dirTab = 'clientes';
+
+async function renderDirectorios(container) {
+    const isMaster = currentUser.role === 'master';
+    container.innerHTML = `
+        <div style="padding:30px;max-width:1100px;margin:0 auto;">
+            <div style="display:flex;align-items:center;gap:15px;margin-bottom:30px;">
+                <div style="width:48px;height:48px;background:linear-gradient(135deg,#1a5f7a,#2980b9);border-radius:12px;display:flex;align-items:center;justify-content:center;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                </div>
+                <div>
+                    <h2 style="margin:0;font-size:26px;font-weight:800;color:#1a1a1a;">Directorios</h2>
+                    <p style="margin:0;color:#666;font-size:14px;">${isMaster ? 'Visualiza los directorios de clientes, choferes y vehículos de todas las canteras' : 'Gestiona tus clientes, choferes y vehículos frecuentes'}</p>
+                </div>
+            </div>
+            
+            ${isMaster ? `
+            <div style="margin-bottom: 24px; display: flex; align-items: center; gap: 12px; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid #e8ecf0;">
+                <label style="font-weight: 700; font-size: 14px; color: #1a5f7a;">🏢 Cantera:</label>
+                <select id="dir-admin-cantera-filter" onchange="cargarDirTab(dirTab)" class="form-control" style="max-width: 300px; padding: 8px 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; font-weight: 600;">
+                    <option value="">Todas las Canteras</option>
+                </select>
+            </div>
+            ` : ''}
+
+            <div style="display:flex;gap:8px;margin-bottom:24px;background:#f0f4f8;border-radius:12px;padding:6px;">
+                <button id="dir-tab-clientes" onclick="cambiarDirTab('clientes')" style="flex:1;padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;background:white;color:#1a5f7a;box-shadow:0 2px 8px rgba(0,0,0,0.1);">📋 Clientes</button>
+                <button id="dir-tab-choferes" onclick="cambiarDirTab('choferes')" style="flex:1;padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;background:transparent;color:#666;">🧑 Choferes</button>
+                <button id="dir-tab-vehiculos" onclick="cambiarDirTab('vehiculos')" style="flex:1;padding:10px 20px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;background:transparent;color:#666;">🚛 Vehículos</button>
+            </div>
+            <div id="dir-tab-content" style="min-height:400px;">
+                <div style="text-align:center;padding:60px;color:#999;">Cargando...</div>
+            </div>
+        </div>
+    `;
+    
+    if (isMaster) {
+        try {
+            const res = await apiRequest('/empresas');
+            const select = document.getElementById('dir-admin-cantera-filter');
+            if (select && res.empresas) {
+                res.empresas.forEach(emp => {
+                    const opt = document.createElement('option');
+                    opt.value = emp.id;
+                    opt.textContent = emp.razon_social;
+                    select.appendChild(opt);
+                });
+            }
+        } catch (e) {
+            console.error('Error al cargar empresas para filtro:', e);
+        }
+    }
+
+    dirTab = 'clientes';
+    await cargarDirTab('clientes');
+}
+
+function cambiarDirTab(tab) {
+    dirTab = tab;
+    ['clientes','choferes','vehiculos'].forEach(t => {
+        const btn = document.getElementById('dir-tab-' + t);
+        if (!btn) return;
+        if (t === tab) {
+            btn.style.background = 'white';
+            btn.style.color = '#1a5f7a';
+            btn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+        } else {
+            btn.style.background = 'transparent';
+            btn.style.color = '#666';
+            btn.style.boxShadow = 'none';
+        }
+    });
+    cargarDirTab(tab);
+}
+
+async function cargarDirTab(tab) {
+    const tabContent = document.getElementById('dir-tab-content');
+    if (!tabContent) return;
+    tabContent.innerHTML = '<div style="text-align:center;padding:60px;color:#999;">Cargando...</div>';
+    try {
+        let url = '/directorios/' + tab;
+        const filterSelect = document.getElementById('dir-admin-cantera-filter');
+        if (filterSelect && filterSelect.value) {
+            url += '?empresa_id=' + filterSelect.value;
+        }
+        const res = await apiRequest(url);
+        const items = res[tab] || [];
+        renderDirTabContent(tab, items, tabContent);
+    } catch (err) {
+        tabContent.innerHTML = '<div style="text-align:center;padding:40px;color:#dc3545;">Error al cargar: ' + err.message + '</div>';
+    }
+}
+
+function renderDirTabContent(tab, items, container) {
+    const icons = { clientes:'📋', choferes:'🧑', vehiculos:'🚛' };
+    const singulars = { clientes:'Cliente', choferes:'Chofer', vehiculos:'Vehículo' };
+    const icon = icons[tab];
+    const isMaster = currentUser.role === 'master';
+
+    let tableHtml = '';
+    if (items.length === 0) {
+        tableHtml = '<div style="text-align:center;padding:60px;color:#999;"><div style="font-size:48px;margin-bottom:12px;">' + icon + '</div><p>No hay ' + tab + ' guardados aún.</p></div>';
+    } else {
+        let rows = '';
+        let headCols = '';
+        if (tab === 'clientes') {
+            headCols = isMaster 
+                ? '<th>Cantera</th><th>Nombre / Razón Social</th><th>RIF / Cédula</th><th>Dirección</th>'
+                : '<th>Nombre / Razón Social</th><th>RIF / Cédula</th><th>Dirección</th><th>Acciones</th>';
+            rows = items.map(function(c) {
+                return '<tr>' + 
+                    (isMaster ? '<td style="font-weight:600;color:#1a5f7a;">' + (c.empresa_nombre||'-') + '</td>' : '') +
+                    '<td style="font-weight:600;">' + c.nombre + '</td>' +
+                    '<td>' + c.rif + '</td>' +
+                    '<td style="color:#666;font-size:13px;">' + (c.direccion||'-') + '</td>' +
+                    (!isMaster ? '<td><button onclick="eliminarDirItem(\'clientes\',\'' + c.id + '\',\'' + c.nombre.replace(/'/g,"\\\'") + '\')" style="background:#dc3545;color:white;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">Eliminar</button></td>' : '') +
+                    '</tr>';
+            }).join('');
+        } else if (tab === 'choferes') {
+            headCols = isMaster 
+                ? '<th>Cantera</th><th>Nombre</th><th>Cédula</th><th>Teléfono</th>'
+                : '<th>Nombre</th><th>Cédula</th><th>Teléfono</th><th>Acciones</th>';
+            rows = items.map(function(c) {
+                return '<tr>' +
+                    (isMaster ? '<td style="font-weight:600;color:#1a5f7a;">' + (c.empresa_nombre||'-') + '</td>' : '') +
+                    '<td style="font-weight:600;">' + c.nombre + '</td>' +
+                    '<td>' + c.cedula + '</td>' +
+                    '<td>' + (c.telefono||'-') + '</td>' +
+                    (!isMaster ? '<td><button onclick="eliminarDirItem(\'choferes\',\'' + c.id + '\',\'' + c.nombre.replace(/'/g,"\\\'") + '\')" style="background:#dc3545;color:white;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">Eliminar</button></td>' : '') +
+                    '</tr>';
+            }).join('');
+        } else {
+            headCols = isMaster 
+                ? '<th>Cantera</th><th>Marca / Modelo</th><th>Placa</th><th>Color</th><th>Carrocería</th>'
+                : '<th>Marca / Modelo</th><th>Placa</th><th>Color</th><th>Carrocería</th><th>Acciones</th>';
+            rows = items.map(function(v) {
+                return '<tr>' +
+                    (isMaster ? '<td style="font-weight:600;color:#1a5f7a;">' + (v.empresa_nombre||'-') + '</td>' : '') +
+                    '<td style="font-weight:600;">' + v.marca + ' ' + v.modelo + '</td>' +
+                    '<td>' + v.placa + '</td>' +
+                    '<td>' + (v.color||'-') + '</td>' +
+                    '<td>' + (v.carroceria||'-') + '</td>' +
+                    (!isMaster ? '<td><button onclick="eliminarDirItem(\'vehiculos\',\'' + v.id + '\',\'' + v.placa + '\')" style="background:#dc3545;color:white;border:none;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">Eliminar</button></td>' : '') +
+                    '</tr>';
+            }).join('');
+        }
+        const thStyle = 'padding:14px 16px;text-align:left;color:white;font-size:13px;font-weight:700;';
+        const heads = headCols.replace(/<th>/g,'<th style="'+thStyle+'">');
+        tableHtml = '<div style="overflow-x:auto;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.07);border:1px solid #e8ecf0;"><table style="width:100%;border-collapse:collapse;background:white;"><thead><tr style="background:linear-gradient(135deg,#1a5f7a,#2980b9);">' + heads + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+    }
+
+    const actionButtonHtml = !isMaster 
+        ? '<div style="margin-top:20px;text-align:right;"><button onclick="abrirFormNuevoDirItem(\'' + tab + '\')" style="display:inline-flex;align-items:center;gap:8px;background:linear-gradient(135deg,#1a5f7a,#2980b9);color:white;border:none;border-radius:10px;padding:12px 22px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(26,95,122,0.35);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>Agregar ' + singulars[tab] + '</button></div>'
+        : '';
+
+    container.innerHTML = tableHtml + actionButtonHtml;
+
+    container.querySelectorAll('tbody tr').forEach(function(tr, i) {
+        tr.style.borderBottom = '1px solid #f0f4f8';
+        tr.style.background = i % 2 === 0 ? '#fff' : '#f9fbfc';
+        tr.querySelectorAll('td').forEach(function(td) { td.style.padding = '12px 16px'; td.style.fontSize = '14px'; });
+    });
+}
+
+function abrirFormNuevoDirItem(tab) {
+    const singulars = { clientes:'Cliente', choferes:'Chofer', vehiculos:'Vehículo' };
+    let formFields = '';
+    if (tab === 'clientes') {
+        formFields = '<div class="form-group" style="margin-bottom:14px;text-align:left;"><label style="font-size:13px;font-weight:700;margin-bottom:5px;display:block;">Razón Social / Nombre *</label><input type="text" id="dir-new-nombre" class="form-control" placeholder="Nombre o razón social"></div><div class="form-group" style="margin-bottom:14px;text-align:left;"><label style="font-size:13px;font-weight:700;margin-bottom:5px;display:block;">RIF / Cédula *</label><input type="text" id="dir-new-rif" class="form-control" placeholder="Ej: J-12345678-9"></div><div class="form-group" style="margin-bottom:14px;text-align:left;"><label style="font-size:13px;font-weight:700;margin-bottom:5px;display:block;">Dirección Fiscal</label><input type="text" id="dir-new-direccion" class="form-control" placeholder="Opcional"></div>';
+    } else if (tab === 'choferes') {
+        formFields = '<div class="form-group" style="margin-bottom:14px;text-align:left;"><label style="font-size:13px;font-weight:700;margin-bottom:5px;display:block;">Nombre Completo *</label><input type="text" id="dir-new-nombre" class="form-control" placeholder="Nombres y apellidos"></div><div class="form-group" style="margin-bottom:14px;text-align:left;"><label style="font-size:13px;font-weight:700;margin-bottom:5px;display:block;">Cédula de Identidad *</label><input type="text" id="dir-new-cedula" class="form-control" placeholder="Ej: V-12345678"></div><div class="form-group" style="margin-bottom:14px;text-align:left;"><label style="font-size:13px;font-weight:700;margin-bottom:5px;display:block;">Teléfono</label><input type="text" id="dir-new-telefono" class="form-control" placeholder="Opcional"></div>';
+    } else {
+        formFields = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:left;"><div class="form-group" style="margin-bottom:14px;"><label style="font-size:13px;font-weight:700;margin-bottom:5px;display:block;">Marca *</label><input type="text" id="dir-new-marca" class="form-control" placeholder="Ej: Ford"></div><div class="form-group" style="margin-bottom:14px;"><label style="font-size:13px;font-weight:700;margin-bottom:5px;display:block;">Modelo *</label><input type="text" id="dir-new-modelo" class="form-control" placeholder="Ej: F-350"></div><div class="form-group" style="margin-bottom:14px;"><label style="font-size:13px;font-weight:700;margin-bottom:5px;display:block;">Placa *</label><input type="text" id="dir-new-placa" class="form-control" placeholder="Ej: ABC123D" style="text-transform:uppercase;"></div><div class="form-group" style="margin-bottom:14px;"><label style="font-size:13px;font-weight:700;margin-bottom:5px;display:block;">Color</label><input type="text" id="dir-new-color" class="form-control" placeholder="Ej: Blanco"></div><div class="form-group" style="margin-bottom:14px;grid-column:1/-1;"><label style="font-size:13px;font-weight:700;margin-bottom:5px;display:block;">Tipo de Carrocería</label><select id="dir-new-carroceria" class="form-control"><option value="">Seleccione...</option><option value="Volteo">Volteo</option><option value="Plataforma">Plataforma</option><option value="Cava">Cava</option><option value="Cisterna">Cisterna</option><option value="Otro">Otro</option></select></div></div>';
+    }
+
+    Swal.fire({
+        title: 'Agregar ' + singulars[tab],
+        html: formFields,
+        showCancelButton: true,
+        confirmButtonText: 'Guardar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#1a5f7a',
+        preConfirm: function() {
+            if (tab === 'clientes') {
+                var nombre = document.getElementById('dir-new-nombre').value.trim();
+                var rif = document.getElementById('dir-new-rif').value.trim();
+                if (!nombre || !rif) { Swal.showValidationMessage('Nombre y RIF son obligatorios'); return false; }
+                return { nombre: nombre, rif: rif, direccion: document.getElementById('dir-new-direccion').value.trim() };
+            } else if (tab === 'choferes') {
+                var nombre = document.getElementById('dir-new-nombre').value.trim();
+                var cedula = document.getElementById('dir-new-cedula').value.trim();
+                if (!nombre || !cedula) { Swal.showValidationMessage('Nombre y Cédula son obligatorios'); return false; }
+                return { nombre: nombre, cedula: cedula, telefono: document.getElementById('dir-new-telefono').value.trim() };
+            } else {
+                var marca = document.getElementById('dir-new-marca').value.trim();
+                var modelo = document.getElementById('dir-new-modelo').value.trim();
+                var placa = document.getElementById('dir-new-placa').value.trim().toUpperCase();
+                if (!marca || !modelo || !placa) { Swal.showValidationMessage('Marca, Modelo y Placa son obligatorios'); return false; }
+                return { marca: marca, modelo: modelo, placa: placa, color: document.getElementById('dir-new-color').value.trim(), carroceria: document.getElementById('dir-new-carroceria').value };
+            }
+        }
+    }).then(async function(result) {
+        if (!result.isConfirmed) return;
+        try {
+            showLoading(true);
+            await apiRequest('/directorios/' + tab, 'POST', result.value);
+            Swal.fire({ icon: 'success', title: 'Guardado', text: singulars[tab] + ' agregado al directorio.', confirmButtonColor: '#1a5f7a' });
+            await cargarDirTab(tab);
+        } catch (err) {
+            Swal.fire('Error', err.message, 'error');
+        } finally {
+            showLoading(false);
+        }
+    });
+}
+
+async function eliminarDirItem(tab, id, nombre) {
+    const labels = { clientes:'cliente', choferes:'chofer', vehiculos:'vehículo' };
+    const result = await Swal.fire({
+        title: '¿Eliminar ' + labels[tab] + '?',
+        html: 'Se eliminará <strong>' + nombre + '</strong> del directorio.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc3545'
+    });
+    if (!result.isConfirmed) return;
+    try {
+        showLoading(true);
+        await apiRequest('/directorios/' + tab + '/' + id, 'DELETE');
+        Swal.fire({ icon: 'success', title: 'Eliminado', text: nombre + ' fue eliminado.', confirmButtonColor: '#1a5f7a', timer: 2000, showConfirmButton: false });
+        await cargarDirTab(tab);
+    } catch (err) {
+        Swal.fire('Error', err.message, 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+async function abrirSelectorDirectorio(tab) {
+    const labels = { clientes:'Cliente', choferes:'Chofer', vehiculos:'Vehículo' };
+    try {
+        showLoading(true);
+        const res = await apiRequest('/directorios/' + tab);
+        const items = res[tab] || [];
+        showLoading(false);
+        if (items.length === 0) {
+            Swal.fire({ icon:'info', title:'Sin ' + tab + ' en el directorio', html:'No tienes ' + tab + ' guardados aún.<br>Puedes agregarlos desde el módulo <strong>Directorios</strong> en el menú.', confirmButtonColor:'#1a5f7a' });
+            return;
+        }
+        let options = '';
+        if (tab === 'clientes') {
+            options = items.map(function(c) { return '<option value="' + c.id + '">' + c.nombre + ' — ' + c.rif + '</option>'; }).join('');
+        } else if (tab === 'choferes') {
+            options = items.map(function(c) { return '<option value="' + c.id + '">' + c.nombre + ' — ' + c.cedula + '</option>'; }).join('');
+        } else {
+            options = items.map(function(v) { return '<option value="' + v.id + '">' + v.marca + ' ' + v.modelo + ' — ' + v.placa + '</option>'; }).join('');
+        }
+        const result = await Swal.fire({
+            title: 'Seleccionar ' + labels[tab],
+            html: '<select id="dir-selector-select" class="form-control" style="width:100%;padding:10px;border-radius:8px;font-size:14px;border:1px solid #ddd;margin-top:10px;">' + options + '</select>',
+            showCancelButton: true,
+            confirmButtonText: 'Seleccionar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#1a5f7a',
+            preConfirm: function() {
+                var sel = document.getElementById('dir-selector-select');
+                return sel ? sel.value : null;
+            }
+        });
+        if (!result.isConfirmed || !result.value) return;
+        var selectedId = result.value;
+        if (tab === 'clientes') {
+            var item = items.find(function(c) { return c.id === selectedId; });
+            if (!item) return;
+            setFormField('campo-cliente_nombre', item.nombre);
+            setFormField('campo-cliente_rif', item.rif);
+            setFormField('campo-cliente_direccion', item.direccion || '');
+        } else if (tab === 'choferes') {
+            var item = items.find(function(c) { return c.id === selectedId; });
+            if (!item) return;
+            setFormField('campo-conductor_nombre', item.nombre);
+            setFormField('campo-conductor_cedula', item.cedula);
+        } else {
+            var item = items.find(function(v) { return v.id === selectedId; });
+            if (!item) return;
+            setFormField('campo-vehiculo_marca', item.marca);
+            setFormField('campo-vehiculo_modelo', item.modelo);
+            setFormField('campo-vehiculo_placa', item.placa);
+            setFormField('campo-vehiculo_color', item.color || '');
+            setSelectField('campo-vehiculo_carroceria', item.carroceria || '');
+        }
+    } catch (err) {
+        showLoading(false);
+        Swal.fire('Error', err.message, 'error');
+    }
+}
+
+function setFormField(id, value) {
+    var el = document.getElementById(id);
+    if (el) { el.value = value; el.dispatchEvent(new Event('input')); }
+}
+
+function setSelectField(id, value) {
+    var el = document.getElementById(id);
+    if (el) { el.value = value; el.dispatchEvent(new Event('change')); }
 }
